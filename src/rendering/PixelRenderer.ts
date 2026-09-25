@@ -910,20 +910,34 @@ export class PixelRenderer {
       const { x: sx, y: sy } = this.camera.worldToScreen(v.x, v.y, 0);
 
       if (v.isTruck) {
-        // Semi-truck trailer & cab
-        this.ctx.fillStyle = '#e2e8f0'; // cab
-        this.ctx.fillRect(sx - 6 * z, sy - 3 * z, 5 * z, 5 * z);
-        this.ctx.fillStyle = v.color; // shipping container
-        this.ctx.fillRect(sx - 1 * z, sy - 4 * z, 10 * z, 6 * z);
-        this.ctx.fillStyle = '#000000'; // wheels
-        this.ctx.fillRect(sx - 5 * z, sy + 2 * z, 3 * z, 2 * z);
-        this.ctx.fillRect(sx + 4 * z, sy + 2 * z, 4 * z, 2 * z);
+        if (assetManager.hasSprite('semi_truck')) {
+          const img = assetManager.getSprite('semi_truck')!;
+          const w = 28 * z;
+          const h = 21 * z;
+          this.ctx.drawImage(img, sx - w / 2, sy - h * 0.7, w, h);
+        } else {
+          // Semi-truck trailer & cab
+          this.ctx.fillStyle = '#e2e8f0'; // cab
+          this.ctx.fillRect(sx - 6 * z, sy - 3 * z, 5 * z, 5 * z);
+          this.ctx.fillStyle = v.color; // shipping container
+          this.ctx.fillRect(sx - 1 * z, sy - 4 * z, 10 * z, 6 * z);
+          this.ctx.fillStyle = '#000000'; // wheels
+          this.ctx.fillRect(sx - 5 * z, sy + 2 * z, 3 * z, 2 * z);
+          this.ctx.fillRect(sx + 4 * z, sy + 2 * z, 4 * z, 2 * z);
+        }
       } else {
-        // Passenger car / taxi
-        this.ctx.fillStyle = v.color;
-        this.ctx.fillRect(sx - 3 * z, sy - 2 * z, 6 * z, 4 * z);
-        this.ctx.fillStyle = '#000000';
-        this.ctx.fillRect(sx - 2 * z, sy - 1 * z, 2 * z, 2 * z);
+        if (assetManager.hasSprite('taxi')) {
+          const img = assetManager.getSprite('taxi')!;
+          const w = 18 * z;
+          const h = 18 * z;
+          this.ctx.drawImage(img, sx - w / 2, sy - h * 0.7, w, h);
+        } else {
+          // Passenger car / taxi
+          this.ctx.fillStyle = v.color;
+          this.ctx.fillRect(sx - 3 * z, sy - 2 * z, 6 * z, 4 * z);
+          this.ctx.fillStyle = '#000000';
+          this.ctx.fillRect(sx - 2 * z, sy - 1 * z, 2 * z, 2 * z);
+        }
       }
     }
   }

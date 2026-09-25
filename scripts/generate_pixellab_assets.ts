@@ -6,7 +6,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '..');
 
-// 1. Try reading token from .env or process.env
 function getToken(): string | null {
   if (process.env.PIXELLAB_API_TOKEN) {
     return process.env.PIXELLAB_API_TOKEN.trim();
@@ -21,7 +20,6 @@ function getToken(): string | null {
     }
   }
 
-  // Also check command line arguments: --token=xyz
   const arg = process.argv.find(a => a.startsWith('--token='));
   if (arg) {
     return arg.split('=')[1].trim();
@@ -35,100 +33,111 @@ interface AssetRequest {
   description: string;
   width: number;
   height: number;
+  direction?: string;
 }
 
-// Curated list of starter assets to send to PixelLab
 const ASSET_QUEUE: AssetRequest[] = [
-  // 1. Buildings
+  // 1. Residential Buildings
   {
     id: 'house_cottage',
-    description: 'Isometric 2.5D small single-story suburban cottage house, red pitched roof, front porch, chimney, clean 16-bit pixel art, isolated transparent background',
+    description: 'Isometric single-story suburban cottage house, red pitched roof, front porch, chimney, clean 16-bit pixel art',
     width: 64,
-    height: 64
+    height: 64,
+    direction: 'south-east'
   },
   {
     id: 'townhouse',
-    description: 'Isometric 2.5D 2-story brick townhouse, brownstone facade, black iron balcony railing, clean 16-bit pixel art, isolated transparent background',
+    description: 'Isometric 2-story brick townhouse, brownstone facade, black iron balcony railing, clean 16-bit pixel art',
     width: 64,
-    height: 96
+    height: 64,
+    direction: 'south-east'
   },
   {
     id: 'apartment_tower',
-    description: 'Isometric 2.5D 5-story modern apartment building, glass balconies, rooftop water tank and AC fans, clean 16-bit pixel art, isolated transparent background',
-    width: 96,
-    height: 128
+    description: 'Isometric 5-story modern apartment building, balconies, rooftop water tank, clean 16-bit pixel art',
+    width: 64,
+    height: 64,
+    direction: 'south-east'
   },
+  // 2. Commercial Buildings
   {
     id: 'corner_diner',
-    description: 'Isometric 2.5D retro diner restaurant, red and white striped awning, glass display window, neon signage, clean 16-bit pixel art, isolated transparent background',
+    description: 'Isometric retro diner cafe restaurant, red and white striped awning, glass display window, neon sign, clean 16-bit pixel art',
     width: 64,
-    height: 64
+    height: 64,
+    direction: 'south-east'
   },
   {
     id: 'office_building',
-    description: 'Isometric 2.5D 3-story office building, retail ground floor, rooftop billboard, clean 16-bit pixel art, isolated transparent background',
+    description: 'Isometric 3-story office building, retail ground floor, rooftop sign, clean 16-bit pixel art',
     width: 64,
-    height: 96
+    height: 64,
+    direction: 'south-east'
   },
   {
     id: 'skyscraper',
-    description: 'Isometric 2.5D sleek corporate glass skyscraper, blue-tinted windows, rooftop communications tower, clean 16-bit pixel art, isolated transparent background',
-    width: 96,
-    height: 144
+    description: 'Isometric sleek corporate glass skyscraper, blue-tinted windows, rooftop antenna beacon, clean 16-bit pixel art',
+    width: 64,
+    height: 64,
+    direction: 'south-east'
   },
+  // 3. Industrial Buildings
   {
     id: 'warehouse',
-    description: 'Isometric 2.5D industrial storage warehouse, metal roll-up garage door, loading bay, clean 16-bit pixel art, isolated transparent background',
+    description: 'Isometric industrial storage warehouse, metal roll-up garage door, loading bay, clean 16-bit pixel art',
     width: 64,
-    height: 64
+    height: 64,
+    direction: 'south-east'
   },
   {
     id: 'factory',
-    description: 'Isometric 2.5D brick manufacturing plant with two tall brick smokestacks, industrial piping, clean 16-bit pixel art, isolated transparent background',
-    width: 96,
-    height: 96
+    description: 'Isometric brick manufacturing plant with two tall brick smokestacks, industrial piping, clean 16-bit pixel art',
+    width: 64,
+    height: 64,
+    direction: 'south-east'
   },
-  // 2. Municipal / Utilities
+  // 4. Municipal / Utilities
   {
     id: 'power_plant',
-    description: 'Isometric 2.5D coal-fired power plant with wide concrete cooling tower and transformer coils, clean 16-bit pixel art, isolated transparent background',
-    width: 96,
-    height: 96
+    description: 'Isometric coal-fired power plant with wide concrete cooling tower and transformer coils, clean 16-bit pixel art',
+    width: 64,
+    height: 64,
+    direction: 'south-east'
   },
   {
     id: 'water_pump',
-    description: 'Isometric 2.5D municipal water pumping station, blue reservoir tank, intake pipes, clean 16-bit pixel art, isolated transparent background',
+    description: 'Isometric municipal water pumping station, blue reservoir tank, intake pipes, clean 16-bit pixel art',
     width: 64,
-    height: 64
+    height: 64,
+    direction: 'south-east'
   },
   {
     id: 'city_park',
-    description: 'Isometric 2.5D city park, stone fountain in center, paved walkway, oak tree and park benches, clean 16-bit pixel art, isolated transparent background',
+    description: 'Isometric city park, stone fountain in center, paved walkway, oak tree and park benches, clean 16-bit pixel art',
     width: 64,
-    height: 64
+    height: 64,
+    direction: 'south-east'
   },
-  // 3. Vehicles
+  // 5. Vehicles
   {
     id: 'taxi',
-    description: 'Isometric 2.5D yellow city taxi cab sedan car, clean 16-bit pixel art, isolated transparent background',
+    description: 'Isometric yellow city taxi cab sedan car, clean 16-bit pixel art',
     width: 48,
-    height: 48
+    height: 48,
+    direction: 'south-east'
   },
   {
     id: 'semi_truck',
-    description: 'Isometric 2.5D freight semi-trailer truck with colorful shipping container, clean 16-bit pixel art, isolated transparent background',
+    description: 'Isometric freight semi-trailer truck with colorful cargo shipping container, clean 16-bit pixel art',
     width: 64,
-    height: 48
+    height: 48,
+    direction: 'south-east'
   }
 ];
 
-async function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
 async function generateAsset(token: string, asset: AssetRequest, outputDir: string) {
   console.log(`\n🎨 [${asset.id}] Submitting generation job to PixelLab...`);
-  console.log(`   Prompt: "${asset.description.substring(0, 70)}..."`);
+  console.log(`   Prompt: "${asset.description.substring(0, 65)}..."`);
 
   const response = await fetch('https://api.pixellab.ai/v2/create-image-pixen', {
     method: 'POST',
@@ -141,7 +150,11 @@ async function generateAsset(token: string, asset: AssetRequest, outputDir: stri
       image_size: {
         width: asset.width,
         height: asset.height
-      }
+      },
+      view: 'low top-down',
+      direction: asset.direction || 'south-east',
+      no_background: true,
+      detail: 'highly detailed'
     })
   });
 
@@ -150,57 +163,27 @@ async function generateAsset(token: string, asset: AssetRequest, outputDir: stri
     throw new Error(`PixelLab API error (${response.status}): ${errorText}`);
   }
 
-  const data = await response.json() as { job_id?: string; image_url?: string; status?: string };
+  const data = await response.json() as {
+    image?: { type: string; base64: string };
+    usage?: { usd: number };
+  };
 
-  let imageUrl = data.image_url;
-
-  // If a background job was queued, poll for completion
-  if (!imageUrl && data.job_id) {
-    console.log(`   ⏳ Job ID: ${data.job_id}. Waiting for PixelLab AI generation...`);
-    const jobId = data.job_id;
-    let completed = false;
-    let attempts = 0;
-
-    while (!completed && attempts < 30) {
-      await sleep(5000);
-      attempts++;
-      process.stdout.write('.');
-
-      const pollRes = await fetch(`https://api.pixellab.ai/v2/background-jobs/${jobId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (pollRes.ok) {
-        const pollData = await pollRes.json() as { status?: string; result?: { image_url?: string } };
-        if (pollData.status === 'completed' && pollData.result?.image_url) {
-          imageUrl = pollData.result.image_url;
-          completed = true;
-          console.log('\n   ✅ Generation completed!');
-          break;
-        } else if (pollData.status === 'failed') {
-          throw new Error(`Job ${jobId} failed`);
-        }
-      }
-    }
+  if (!data.image?.base64) {
+    throw new Error(`No image base64 returned in response`);
   }
 
-  if (!imageUrl) {
-    throw new Error(`Could not obtain image URL for ${asset.id}`);
-  }
-
-  // Download image file
-  console.log(`   📥 Downloading sprite from: ${imageUrl}`);
-  const imgRes = await fetch(imageUrl);
-  const buffer = await imgRes.arrayBuffer();
+  // Strip possible data:image/png;base64, prefix
+  const base64Data = data.image.base64.replace(/^data:image\/\w+;base64,/, '');
+  const buffer = Buffer.from(base64Data, 'base64');
 
   const outPath = path.join(outputDir, `${asset.id}.png`);
-  fs.writeFileSync(outPath, Buffer.from(buffer));
-  console.log(`   ✨ Saved to public/assets/sprites/${asset.id}.png`);
+  fs.writeFileSync(outPath, buffer);
+  console.log(`   ✨ Saved sprite: public/assets/sprites/${asset.id}.png (${buffer.length} bytes)`);
 }
 
 async function main() {
   console.log('====================================================');
-  console.log('🏙️  PIXEL CITY SIM — PIXELLAB BATCH ASSET GENERATOR');
+  console.log('🏙️  PIXEL CITY SIM — PIXELLAB ASSET GENERATOR');
   console.log('====================================================');
 
   const token = getToken();
@@ -220,7 +203,7 @@ async function main() {
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
-  console.log(`\n📋 Queued ${ASSET_QUEUE.length} assets for generation.`);
+  console.log(`\n📋 Processing ${ASSET_QUEUE.length} assets through PixelLab...`);
 
   let successCount = 0;
   for (const asset of ASSET_QUEUE) {
