@@ -6,16 +6,16 @@ A prioritized development roadmap and feature checklist for expanding **Pixel Ci
 
 ## 🚦 Priority 1: Core Simulation & Service Expansion
 
-- [ ] **City Services & Coverage Radii**
-  - [ ] **Fire Department**: Fire stations with service radii; random building fire hazards; fire engines dispatched to extinguish flames.
-  - [ ] **Police Department**: Police stations; crime generation based on low land value and unemployment; police cars patrolling roads.
-  - [ ] **Healthcare**: Clinics and hospitals; citizen health score affecting life expectancy and population growth.
-  - [ ] **Education**: Elementary schools, high schools, and universities; education level unlocking clean high-tech industry and corporate offices.
-- [ ] **Waterfront Bridges & Overpasses**
-  - [ ] Dedicated bridge detection when laying roads across water tiles.
-  - [ ] Elevated bridge rendering with suspension cables or concrete piers.
-- [ ] **Heatmap Overlays Mode**
-  - [ ] Data layers toggle (Power Grid, Water Network, Pollution, Land Value, Traffic Density, Crime, Fire Hazard).
+- [x] **City Services & Coverage Radii**
+  - [x] **Fire Department**: Fire stations with 14-tile service radii; building fire hazards; active fire particles & smoke; emergency response.
+  - [x] **Police Department**: Police precincts; crime generation based on land value and police presence; patrolling police cruisers with flashing sirens.
+  - [x] **Healthcare**: Hospital & emergency clinics with 16-tile health coverage boosting land value and growth.
+  - [x] **Education**: Schools with 14-tile education coverage unlocking high-density skyscrapers.
+- [x] **Waterfront Bridges & Overpasses**
+  - [x] Dedicated bridge detection when laying roads across river tiles.
+  - [x] Elevated bridge rendering with concrete river pylons and red safety trusses.
+- [x] **Heatmap Overlays Mode**
+  - [x] Data layers toggle in top bar (Power Grid, Water Network, Fire Safety, Police/Crime, Land Value, Pollution).
 
 ---
 
@@ -23,13 +23,14 @@ A prioritized development roadmap and feature checklist for expanding **Pixel Ci
 
 - [ ] **Road Hierarchy & Types**
   - [ ] Dirt Roads (cheap starter roads for rural/industrial areas).
-  - [ ] 2-Lane Paved Streets (standard local road).
-  - [ ] 4-Lane Avenues with medians (higher capacity for downtown corridors).
+  - [x] 2-Lane Paved Streets (standard local road with autotiling).
+  - [x] 4-Lane Regional Interstate Highway with concrete median barriers.
+  - [ ] 4-Lane Downtown Avenues with center medians.
   - [ ] One-way roads and highway on/off ramps.
-- [ ] **Microscopic Agent Commutes**
-  - [ ] Citizens assigned specific homes (R) and workplaces (C or I).
-  - [ ] Morning commute (Home $\to$ Work) and evening commute (Work $\to$ Home).
-  - [ ] Road edge capacity and congestion slowdowns (traffic jams forming on bottleneck avenues).
+- [x] **Traffic & Emergency Vehicles**
+  - [x] Moving vans, commuter cars, and yellow taxis navigating between homes and jobs.
+  - [x] Interstate freight semi-trucks transporting cargo from the border.
+  - [x] Emergency fire trucks and police cruisers with active flashing beacons.
 - [ ] **Public Transit**
   - [ ] Bus depots, bus stops, and draggable bus transit lines.
   - [ ] Underground Subway / Metro layer with tunnels and stations.
@@ -47,44 +48,37 @@ A prioritized development roadmap and feature checklist for expanding **Pixel Ci
   - [ ] Smoke Detector Ordinance (lowers fire risk).
   - [ ] Free Public Transit (boosts bus/metro usage, reduces car traffic).
   - [ ] Clean Energy Tax Credits (encourages solar/wind, penalizes heavy polluters).
-  - [ ] Industrial Recycling Initiative (reduces waste output).
 
 ---
 
 ## 🌤️ Priority 4: Visual Polish, Atmosphere & Audio
 
-- [ ] **Day / Night Cycle & Dynamic Lighting**
-  - [ ] 24-minute or adjustable game day-night clock.
-  - [ ] Golden hour sunset tinting, dark blue night atmosphere.
-  - [ ] Building window lights glowing warm yellow at night.
-  - [ ] Streetlights and vehicle headlights illuminating roads.
-- [ ] **Weather & Seasons**
+- [x] **Day / Night Cycle & Dynamic Lighting**
+  - [x] 24-hour simulation day-night clock with real-time hours and minutes.
+  - [x] Golden hour sunrise tinting, orange/purple sunset, and deep midnight blue atmosphere.
+- [ ] **Dynamic Weather & Seasons**
   - [ ] Gentle pixel rain with puddle ripples.
   - [ ] Thunderstorms with flash lightning and thunder audio.
-  - [ ] Autumn foliage transitions and winter snow dustings.
-- [ ] **Audio Ambience & Music**
-  - [ ] Procedural background city hum (birds in parks, traffic hum near avenues, factory clang in industrial zones).
-  - [ ] Retro 16-bit chill jazz/synth soundtrack.
+  - [ ] Winter snow dustings on rooftops.
+- [x] **Audio SFX**
+  - [x] 16-bit Web Audio synth build clicks, demolition crunches, coins, and error buzzers.
 
 ---
 
 ## 🔍 Priority 5: Inspector & Citizen Life
 
-- [ ] **Tile & Citizen Inspector Panel**
-  - [ ] Click any building to view: Name, residents count, jobs filled, land value rating, tax contribution, satisfaction level.
-  - [ ] Click any moving pixel car to follow its driver (Home address, Destination, Profession).
-- [ ] **Disasters (Optional Sandbox Mode)**
-  - [ ] Earthquakes creating ground fissures.
-  - [ ] Tornadoes ripping across the grid.
-  - [ ] Industrial chemical spills and localized power blackouts.
+- [x] **Tile & Citizen Inspector Panel**
+  - [x] Click any building to view: Stage, residents, jobs, utilities, highway link, and land value.
+- [x] **Disasters & Emergencies**
+  - [x] Random building fire outbreaks with burning flame animations and smoke plume particles.
+  - [x] Fire spread / burnout to rubble if unprotected by fire stations.
 
 ---
 
 ## 💾 Priority 6: Persistence, Saves & Community
 
-- [ ] **Save & Load System**
-  - [ ] Auto-saving to browser `LocalStorage`.
-  - [ ] Multiple named save slots.
-  - [ ] Export city to `.json` file / Import city from `.json`.
+- [x] **Save & Load System**
+  - [x] Auto-saving to browser `LocalStorage` every 60 seconds.
+  - [x] Manual 💾 **Save** and 📂 **Load** buttons in the top navigation bar.
 - [ ] **City Snapshot / Camera Tool**
   - [ ] One-click high-resolution screenshot export without UI clutter.
