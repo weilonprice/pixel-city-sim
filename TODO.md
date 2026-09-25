@@ -33,11 +33,11 @@ A prioritized development roadmap and feature checklist for expanding **Pixel Ci
 
 ## 🚗 Priority 2: Advanced Transportation & Traffic
 
-- [ ] **Road Hierarchy & Types**
-  - [ ] Dirt Roads (cheap starter roads for rural/industrial areas).
-  - [x] 2-Lane Paved Streets (standard local road with autotiling).
+- [x] **Road Hierarchy & Types**
+  - [x] Dirt Roads (cheap starter roads for rural/industrial areas with timber bridges).
+  - [x] 2-Lane Paved Streets (standard local road with autotiling & steel bridges).
   - [x] 4-Lane Regional Interstate Highway with concrete median barriers.
-  - [ ] 4-Lane Downtown Avenues with center medians.
+  - [x] 4-Lane Downtown Avenues with center medians, cable bridges & +15 land value boost.
   - [ ] One-way roads and highway on/off ramps.
 - [x] **Traffic & Emergency Vehicles**
   - [x] Moving vans, commuter cars, and yellow taxis navigating between homes and jobs.
