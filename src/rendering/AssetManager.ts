@@ -13,8 +13,6 @@ export class AssetManager {
 
   private preloadKnownSprites() {
     const assetKeys = [
-      'highway_straight',
-      'road_local',
       'house_cottage',
       'townhouse',
       'apartment_tower',

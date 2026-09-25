@@ -348,6 +348,11 @@ export class SimulationEngine {
     try {
       const serialized = {
         funds: this.funds,
+        population: this.population,
+        totalJobs: this.totalJobs,
+        demandR: this.demandR,
+        demandC: this.demandC,
+        demandI: this.demandI,
         month: this.month,
         year: this.year,
         gameHour: this.gameHour,
@@ -392,6 +397,11 @@ export class SimulationEngine {
       this.month = data.month;
       this.year = data.year;
       this.gameHour = data.gameHour || 12;
+      this.population = data.population !== undefined ? data.population : 0;
+      this.totalJobs = data.totalJobs !== undefined ? data.totalJobs : 0;
+      this.demandR = data.demandR !== undefined ? data.demandR : 30;
+      this.demandC = data.demandC !== undefined ? data.demandC : 15;
+      this.demandI = data.demandI !== undefined ? data.demandI : 25;
 
       for (let x = 0; x < this.grid.size; x++) {
         for (let y = 0; y < this.grid.size; y++) {
@@ -420,8 +430,25 @@ export class SimulationEngine {
         }
       }
 
+      // Re-verify population & jobs tally from actual buildings
+      let totalPop = 0;
+      let totalJobs = 0;
+      for (let x = 0; x < this.grid.size; x++) {
+        for (let y = 0; y < this.grid.size; y++) {
+          const b = this.grid.tiles[x][y].building;
+          if (b && !b.onFire && !b.isConstructing) {
+            totalPop += b.residents;
+            totalJobs += b.jobs;
+          }
+        }
+      }
+      this.population = totalPop;
+      this.totalJobs = totalJobs;
+
       this.updateUtilities();
       this.grid.recalculateServiceCoverages();
+
+      if (this.onStatsUpdate) this.onStatsUpdate();
       if (this.onNotification) this.onNotification('📂 City loaded successfully!');
       return true;
     } catch (e) {
