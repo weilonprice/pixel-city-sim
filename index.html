@@ -463,7 +463,8 @@
     }
 
     /* BUDGET & TAX MODAL */
-    .budget-overlay {
+    .budget-overlay,
+    .modal-overlay {
       position: fixed;
       top: 0;
       left: 0;
@@ -478,8 +479,10 @@
       transition: opacity 0.2s ease;
     }
 
-    .budget-overlay.hidden {
-      display: none;
+    .budget-overlay.hidden,
+    .modal-overlay.hidden,
+    .hidden {
+      display: none !important;
     }
 
     .budget-modal {
@@ -1049,6 +1052,16 @@
       font-size: 8px;
       color: #a7f3d0;
     }
+    .danger-utility-btn {
+      background: #7f1d1d !important;
+      border-color: #ef4444 !important;
+      color: #fef2f2 !important;
+    }
+    .danger-utility-btn:hover {
+      background: #991b1b !important;
+      border-color: #f87171 !important;
+      color: #ffffff !important;
+    }
   </style>
 </head>
 <body>
@@ -1062,6 +1075,7 @@
       <button class="utility-btn" id="btn-load" title="Load City from LocalStorage">📂 Load</button>
       <button class="utility-btn" id="btn-budget" title="Open Municipal Budget & Tax Rates [B]">🏛️ Budget</button>
       <button class="utility-btn" id="btn-snapshot" title="Take City Snapshot Photo [P]">📸 Photo</button>
+      <button class="utility-btn danger-utility-btn" id="btn-disasters" title="Natural Disasters & Emergency Operations [D]">🚨 Disasters</button>
 
       <!-- Data Overlay Selector -->
       <select id="overlay-select" class="overlay-dropdown" title="Select Data Overlay">

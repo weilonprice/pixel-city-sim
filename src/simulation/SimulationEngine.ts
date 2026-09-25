@@ -1,4 +1,4 @@
-import { TileType, ZoneType, Tile, BuildingData, UPKEEP, OverlayMode, WeatherType, CityOrdinances, ORDINANCE_COSTS, isAnyRoad, CITY_MILESTONES, CityMilestone } from '../core/Constants.ts';
+import { TileType, ZoneType, Tile, BuildingData, UPKEEP, OverlayMode, WeatherType, CityOrdinances, ORDINANCE_COSTS, isAnyRoad, CITY_MILESTONES, CityMilestone, DisasterType, TornadoInstance, EarthquakeInstance, MeteorInstance } from '../core/Constants.ts';
 import { Grid } from './Grid.ts';
 import { sounds } from '../core/SoundEffects.ts';
 
@@ -43,6 +43,13 @@ export class SimulationEngine {
   public hasCityHall: boolean = false;
   public hasGrandCentral: boolean = false;
   public onMilestoneReached?: (milestone: CityMilestone) => void;
+
+  // Natural Disasters & Emergency Response
+  public activeTornadoes: TornadoInstance[] = [];
+  public activeEarthquakes: EarthquakeInstance[] = [];
+  public activeMeteors: MeteorInstance[] = [];
+  public onDisasterStarted?: (type: DisasterType, desc: string) => void;
+  public onDisasterEnded?: (type: DisasterType) => void;
 
   // RCI Demands (-100 to +100)
   public demandR: number = 60;
@@ -158,6 +165,14 @@ export class SimulationEngine {
       if (this.tickCount % 5 === 0) {
         this.processZoningAndGrowth();
         this.processFireEmergencies();
+      }
+
+      // 4b. Process Natural Disasters & Emergency Response
+      this.processDisasters();
+
+      // Spontaneous Tornado during Thunderstorms (rare event ~0.3% per tick)
+      if (this.weather === WeatherType.THUNDERSTORM && this.activeTornadoes.length === 0 && Math.random() < 0.003) {
+        this.triggerDisaster(DisasterType.TORNADO);
       }
 
       // 5. Monthly Financial Cycle (every 30 ticks)
@@ -495,8 +510,9 @@ export class SimulationEngine {
           else if (b.fireTimer >= 25) {
             t.type = TileType.GRASS;
             t.building = undefined;
+            t.isRubble = true;
             if (this.onNotification) {
-              this.onNotification(`🔥 Building at (${x}, ${y}) burnt down to ashes due to lack of fire services!`);
+              this.onNotification(`🔥 Building at (${x}, ${y}) burnt down to ashes and rubble!`);
             }
           }
         }
@@ -507,6 +523,307 @@ export class SimulationEngine {
           sounds.playError();
           if (this.onNotification) {
             this.onNotification(`🚨 FIRE BREAKOUT at (${x}, ${y})! Dispatching emergency response!`);
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Triggers a natural disaster
+   */
+  public triggerDisaster(type: DisasterType | 'tornado' | 'earthquake' | 'meteor', targetX?: number, targetY?: number) {
+    const dType = (typeof type === 'string' ? type.toUpperCase() : type) as DisasterType;
+
+    // Pick sensible default coordinate if not provided
+    if (targetX === undefined || targetY === undefined) {
+      let sumX = 0, sumY = 0, count = 0;
+      for (let x = 0; x < this.grid.size; x++) {
+        for (let y = 0; y < this.grid.size; y++) {
+          const t = this.grid.tiles[x][y];
+          if (t.building || isAnyRoad(t.type) || t.type === TileType.POWER_PLANT || t.type === TileType.FIRE_STATION) {
+            sumX += x; sumY += y; count++;
+          }
+        }
+      }
+      targetX = count > 0 ? Math.round(sumX / count) : 30;
+      targetY = count > 0 ? Math.round(sumY / count) : 24;
+    }
+
+    if (dType === DisasterType.TORNADO) {
+      const startX = Math.max(2, targetX - 5);
+      const startY = Math.max(2, targetY - 4);
+      const endX = Math.min(this.grid.size - 3, targetX + 12);
+      const endY = Math.min(this.grid.size - 3, targetY + 10);
+
+      const tornado: TornadoInstance = {
+        id: `tornado_${Date.now()}`,
+        x: startX,
+        y: startY,
+        targetX: endX,
+        targetY: endY,
+        radius: 3.5,
+        speed: 0.5,
+        life: 0,
+        maxLife: 65,
+        rotation: 0
+      };
+      this.activeTornadoes.push(tornado);
+
+      sounds.playCivilDefenseSiren();
+      sounds.playTornadoRoar();
+
+      if (this.onDisasterStarted) {
+        this.onDisasterStarted(DisasterType.TORNADO, 'Category F4 Tornado spotted tearing across the city! Seek shelter immediately!');
+      }
+      if (this.onNotification) {
+        this.onNotification('🚨 CIVIL DEFENSE ALERT: Category F4 Tornado spotted! Seek shelter immediately!');
+      }
+    } else if (dType === DisasterType.EARTHQUAKE) {
+      const epicenterX = targetX;
+      const epicenterY = targetY;
+
+      const faultLines: Array<{ x1: number; y1: number; x2: number; y2: number }> = [
+        { x1: epicenterX, y1: epicenterY, x2: Math.min(this.grid.size - 2, epicenterX + 12), y2: Math.min(this.grid.size - 2, epicenterY + 8) },
+        { x1: epicenterX, y1: epicenterY, x2: Math.max(2, epicenterX - 14), y2: Math.min(this.grid.size - 2, epicenterY + 6) },
+        { x1: epicenterX, y1: epicenterY, x2: Math.max(2, epicenterX - 8), y2: Math.max(2, epicenterY - 12) }
+      ];
+
+      const quake: EarthquakeInstance = {
+        id: `quake_${Date.now()}`,
+        epicenterX,
+        epicenterY,
+        magnitude: 7.2,
+        duration: 80,
+        maxDuration: 80,
+        faultLines
+      };
+      this.activeEarthquakes.push(quake);
+
+      sounds.playEarthquakeRumble();
+      sounds.playCivilDefenseSiren();
+
+      this.applyEarthquakeDamage(quake);
+
+      if (this.onDisasterStarted) {
+        this.onDisasterStarted(DisasterType.EARTHQUAKE, 'Magnitude 7.2 Earthquake rocking the metropolitan region! Major structural damage reported!');
+      }
+      if (this.onNotification) {
+        this.onNotification('🚨 SEISMIC EMERGENCY: Magnitude 7.2 Earthquake rocking the city! Infrastructure damaged!');
+      }
+    } else if (dType === DisasterType.METEOR) {
+      const meteor: MeteorInstance = {
+        id: `meteor_${Date.now()}`,
+        startX: targetX - 22,
+        startY: targetY - 22,
+        targetX,
+        targetY,
+        currentX: targetX - 22,
+        currentY: targetY - 22,
+        altitude: 150,
+        speed: 5.0,
+        exploded: false,
+        blastRadius: 4.5,
+        explosionLife: 40
+      };
+      this.activeMeteors.push(meteor);
+
+      sounds.playCivilDefenseSiren();
+
+      if (this.onDisasterStarted) {
+        this.onDisasterStarted(DisasterType.METEOR, 'Cosmic asteroid descending towards the metropolitan area! Emergency impact warning!');
+      }
+      if (this.onNotification) {
+        this.onNotification('🚨 ASTRONOMICAL ALERT: Cosmic meteor descending! Brace for high-energy impact!');
+      }
+    }
+  }
+
+  public abortAllDisasters() {
+    this.activeTornadoes = [];
+    this.activeEarthquakes = [];
+    this.activeMeteors = [];
+    if (this.onNotification) {
+      this.onNotification('🌤️ Emergency operations stood down. All active disaster alerts cleared.');
+    }
+  }
+
+  public cleanupAllRubble(): { cleanedCount: number; cost: number } {
+    let count = 0;
+    for (let x = 0; x < this.grid.size; x++) {
+      for (let y = 0; y < this.grid.size; y++) {
+        if (this.grid.clearRubble(x, y)) {
+          count++;
+        }
+      }
+    }
+    const cost = count * 10;
+    this.funds = Math.max(0, this.funds - cost);
+    this.updateUtilities();
+    this.grid.recalculateServiceCoverages(
+      this.fundingFire,
+      this.fundingPolice,
+      this.fundingHealth,
+      this.fundingEducation,
+      this.fundingTransit,
+      this.ordinances
+    );
+    sounds.playDemolish();
+    if (this.onNotification) {
+      this.onNotification(`🚜 Municipal cleanup crews cleared ${count} ruins/rubble sites (-$${cost})!`);
+    }
+    return { cleanedCount: count, cost };
+  }
+
+  private applyEarthquakeDamage(quake: EarthquakeInstance) {
+    quake.faultLines.forEach(line => {
+      const steps = Math.max(Math.abs(line.x2 - line.x1), Math.abs(line.y2 - line.y1));
+      for (let s = 0; s <= steps; s++) {
+        const gx = Math.round(line.x1 + (line.x2 - line.x1) * (s / steps));
+        const gy = Math.round(line.y1 + (line.y2 - line.y1) * (s / steps));
+        const tile = this.grid.getTile(gx, gy);
+        if (!tile) continue;
+
+        if (isAnyRoad(tile.type) || tile.type === TileType.TRAIN_TRACK) {
+          tile.damaged = true;
+          tile.isRubble = true;
+        }
+
+        if (tile.building) {
+          if (Math.random() < 0.6) {
+            this.grid.demolishTileToRubble(gx, gy);
+          } else {
+            tile.building.onFire = true;
+          }
+        }
+      }
+    });
+
+    for (let dx = -4; dx <= 4; dx++) {
+      for (let dy = -4; dy <= 4; dy++) {
+        const dist = Math.hypot(dx, dy);
+        if (dist > 4.5) continue;
+        const gx = quake.epicenterX + dx;
+        const gy = quake.epicenterY + dy;
+        const tile = this.grid.getTile(gx, gy);
+        if (!tile) continue;
+
+        if (tile.building && Math.random() < 0.45) {
+          this.grid.demolishTileToRubble(gx, gy);
+        } else if (tile.building && Math.random() < 0.35) {
+          tile.building.onFire = true;
+        }
+      }
+    }
+  }
+
+  private processDisasters() {
+    // 1. Process Active Tornadoes
+    for (let i = this.activeTornadoes.length - 1; i >= 0; i--) {
+      const t = this.activeTornadoes[i];
+      t.life++;
+      t.rotation += 0.45;
+
+      const totalDx = t.targetX - t.x;
+      const totalDy = t.targetY - t.y;
+      const dist = Math.hypot(totalDx, totalDy);
+
+      if (dist > 0.5) {
+        const nx = totalDx / dist;
+        const ny = totalDy / dist;
+        const wobble = Math.sin(t.life * 0.25) * 0.12;
+        t.x += (nx + wobble) * t.speed;
+        t.y += (ny - wobble) * t.speed;
+      }
+
+      const rad = Math.ceil(t.radius);
+      for (let dx = -rad; dx <= rad; dx++) {
+        for (let dy = -rad; dy <= rad; dy++) {
+          if (Math.hypot(dx, dy) <= t.radius) {
+            const gx = Math.round(t.x + dx);
+            const gy = Math.round(t.y + dy);
+            if (this.grid.isValidCoord(gx, gy)) {
+              const tile = this.grid.getTile(gx, gy);
+              if (tile && (tile.building || isAnyRoad(tile.type) || tile.type === TileType.TRAIN_TRACK || (tile.type !== TileType.GRASS && tile.type !== TileType.WATER && tile.type !== TileType.DIRT && tile.type !== TileType.HIGHWAY))) {
+                this.grid.demolishTileToRubble(gx, gy);
+                if (Math.random() < 0.15 && tile.building) {
+                  tile.building.onFire = true;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (t.life >= t.maxLife || !this.grid.isValidCoord(Math.round(t.x), Math.round(t.y))) {
+        this.activeTornadoes.splice(i, 1);
+        if (this.onDisasterEnded) this.onDisasterEnded(DisasterType.TORNADO);
+        if (this.onNotification) {
+          this.onNotification('🌤️ ALL CLEAR: The tornado has dissipated. Emergency crews dispatched for recovery!');
+        }
+      }
+    }
+
+    // 2. Process Active Earthquakes
+    for (let i = this.activeEarthquakes.length - 1; i >= 0; i--) {
+      const q = this.activeEarthquakes[i];
+      q.duration--;
+
+      if (q.duration % 15 === 0 && Math.random() < 0.4) {
+        sounds.playEarthquakeRumble();
+      }
+
+      if (q.duration <= 0) {
+        this.activeEarthquakes.splice(i, 1);
+        if (this.onDisasterEnded) this.onDisasterEnded(DisasterType.EARTHQUAKE);
+        if (this.onNotification) {
+          this.onNotification('🌤️ ALL CLEAR: Seismic tremors have ceased. Civil defense standing down.');
+        }
+      }
+    }
+
+    // 3. Process Active Meteors
+    for (let i = this.activeMeteors.length - 1; i >= 0; i--) {
+      const m = this.activeMeteors[i];
+      if (!m.exploded) {
+        m.altitude -= m.speed;
+        const progress = Math.min(1, Math.max(0, (150 - m.altitude) / 150));
+        m.currentX = m.startX + (m.targetX - m.startX) * progress;
+        m.currentY = m.startY + (m.targetY - m.startY) * progress;
+
+        if (m.altitude <= 0) {
+          m.exploded = true;
+          m.altitude = 0;
+          sounds.playExplosion();
+
+          const blastRad = Math.ceil(m.blastRadius);
+          for (let dx = -blastRad; dx <= blastRad; dx++) {
+            for (let dy = -blastRad; dy <= blastRad; dy++) {
+              const d = Math.hypot(dx, dy);
+              if (d <= m.blastRadius) {
+                const gx = Math.round(m.targetX + dx);
+                const gy = Math.round(m.targetY + dy);
+                if (this.grid.isValidCoord(gx, gy)) {
+                  this.grid.demolishTileToRubble(gx, gy);
+                }
+              } else if (d <= m.blastRadius + 2.5) {
+                const gx = Math.round(m.targetX + dx);
+                const gy = Math.round(m.targetY + dy);
+                const t = this.grid.getTile(gx, gy);
+                if (t && t.building) {
+                  t.building.onFire = true;
+                }
+              }
+            }
+          }
+        }
+      } else {
+        m.explosionLife--;
+        if (m.explosionLife <= 0) {
+          this.activeMeteors.splice(i, 1);
+          if (this.onDisasterEnded) this.onDisasterEnded(DisasterType.METEOR);
+          if (this.onNotification) {
+            this.onNotification('🌤️ Meteor impact site secured. Emergency services attending to survivors.');
           }
         }
       }
@@ -672,6 +989,8 @@ export class SimulationEngine {
           roadMask: t.roadMask,
           isBridge: t.isBridge,
           isRamp: t.isRamp,
+          isRubble: t.isRubble,
+          damaged: t.damaged,
           building: t.building ? {
             id: t.building.id,
             zone: t.building.zone,
@@ -680,7 +999,8 @@ export class SimulationEngine {
             isConstructing: t.building.isConstructing,
             residents: t.building.residents,
             jobs: t.building.jobs,
-            style: t.building.style
+            style: t.building.style,
+            isRubble: t.building.isRubble
           } : undefined
         })))
       };
@@ -739,6 +1059,8 @@ export class SimulationEngine {
           t.roadMask = savedTile.roadMask;
           t.isBridge = savedTile.isBridge;
           t.isRamp = savedTile.isRamp;
+          t.isRubble = savedTile.isRubble;
+          t.damaged = savedTile.damaged;
 
           if (savedTile.building) {
             t.building = {

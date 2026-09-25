@@ -82,16 +82,29 @@ export class NewsTicker {
   public generateHeadlines(): string[] {
     const list: string[] = [];
 
+    // 0. Active Natural Disasters & Emergency Alerts
+    if (this.engine.activeTornadoes.length > 0) {
+      list.push("🌪️ CIVIL DEFENSE ALERT: Violent Category F4 Tornado tearing through metropolitan districts! Seek immediate shelter!");
+    }
+    if (this.engine.activeEarthquakes.length > 0) {
+      list.push("🌋 SEISMIC CRISIS: Major 7.2 Magnitude Earthquake reported! Emergency response teams assessing infrastructure damage!");
+    }
+    if (this.engine.activeMeteors.length > 0) {
+      list.push("☄️ ASTRONOMICAL IMPACT: Blazing asteroid collision site secured! Search and rescue mobilization underway!");
+    }
+
     // 1. Emergency & Utility Headlines
     let firesCount = 0;
     let unpoweredCount = 0;
     let unwateredCount = 0;
     let disconnectedCount = 0;
+    let rubbleCount = 0;
 
     const size = this.engine.grid.size;
     for (let x = 0; x < size; x++) {
       for (let y = 0; y < size; y++) {
         const t = this.engine.grid.tiles[x][y];
+        if (t.isRubble || t.damaged) rubbleCount++;
         if (t.building) {
           if (t.building.onFire) firesCount++;
           if (!t.building.powered) unpoweredCount++;
@@ -99,6 +112,10 @@ export class NewsTicker {
           if (!t.building.hasHighwayAccess) disconnectedCount++;
         }
       }
+    }
+
+    if (rubbleCount > 0) {
+      list.push(`🏚️ CITY RECOVERY: ${rubbleCount} disaster ruins awaiting municipal cleanup crews or demolition bulldozers!`);
     }
 
     if (firesCount > 0) {

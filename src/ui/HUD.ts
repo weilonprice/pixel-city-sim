@@ -5,6 +5,7 @@ import { BudgetModal } from './BudgetModal.ts';
 import { MilestoneModal } from './MilestoneModal.ts';
 import { NewsTicker } from './NewsTicker.ts';
 import { SnapshotTool } from './SnapshotTool.ts';
+import { DisasterModal } from './DisasterModal.ts';
 
 export class HUD {
   private engine: SimulationEngine;
@@ -14,6 +15,7 @@ export class HUD {
   public budgetModal: BudgetModal;
   public milestoneModal: MilestoneModal;
   public newsTicker: NewsTicker;
+  public disasterModal: DisasterModal;
   public snapshotTool?: SnapshotTool;
 
   // DOM Elements
@@ -21,6 +23,7 @@ export class HUD {
   private fundsBadgeEl: HTMLElement;
   private budgetBtn: HTMLButtonElement;
   private snapshotBtn: HTMLButtonElement;
+  private disastersBtn?: HTMLButtonElement;
   private muteBtn: HTMLButtonElement;
   private popEl: HTMLElement;
   private dateEl: HTMLElement;
@@ -66,6 +69,7 @@ export class HUD {
     // Initialize sub-components
     this.budgetModal = new BudgetModal(this.engine);
     this.milestoneModal = new MilestoneModal(this.engine);
+    this.disasterModal = new DisasterModal(this.engine);
     const tickerEl = document.getElementById('news-ticker')!;
     const tickerTextEl = document.getElementById('ticker-text')!;
     this.newsTicker = new NewsTicker(this.engine, tickerEl, tickerTextEl);
@@ -85,6 +89,9 @@ export class HUD {
       }
       if (this.milestoneModal.isOpen()) {
         this.milestoneModal.renderMilestonesList();
+      }
+      if (this.disasterModal.getIsOpen()) {
+        this.disasterModal.updateState();
       }
     };
     this.engine.onNotification = (msg: string) => {
@@ -178,6 +185,15 @@ export class HUD {
       });
     }
 
+    // Disaster Emergency Operations Button
+    this.disastersBtn = document.getElementById('btn-disasters') as HTMLButtonElement;
+    if (this.disastersBtn) {
+      this.disastersBtn.addEventListener('click', () => {
+        sounds.playClick();
+        this.disasterModal.toggle();
+      });
+    }
+
     // Weather Conditions Badge Click to Cycle
     if (this.weatherBadgeEl) {
       this.weatherBadgeEl.addEventListener('click', () => {
@@ -208,6 +224,7 @@ export class HUD {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) {
         if (e.key === 'Escape') {
           this.budgetModal.close();
+          this.disasterModal.close();
         }
         return;
       }
@@ -215,6 +232,9 @@ export class HUD {
       if (e.key === 'b' || e.key === 'B') {
         sounds.playClick();
         this.budgetModal.toggle();
+      } else if (e.key === 'd' || e.key === 'D') {
+        sounds.playClick();
+        this.disasterModal.toggle();
       } else if (e.key === 'm' || e.key === 'M') {
         sounds.toggleMute();
         if (this.muteBtn) {
@@ -227,7 +247,10 @@ export class HUD {
           this.snapshotTool.takeSnapshot();
         }
       } else if (e.key === 'Escape') {
-        if (this.budgetModal.isOpen()) {
+        if (this.disasterModal.getIsOpen()) {
+          sounds.playClick();
+          this.disasterModal.close();
+        } else if (this.budgetModal.isOpen()) {
           sounds.playClick();
           this.budgetModal.close();
         } else {

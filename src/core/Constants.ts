@@ -76,6 +76,50 @@ export const ORDINANCE_COSTS: Record<keyof CityOrdinances, number> = {
   readingCampaign: 25
 };
 
+export enum DisasterType {
+  TORNADO = 'TORNADO',
+  EARTHQUAKE = 'EARTHQUAKE',
+  METEOR = 'METEOR'
+}
+
+export interface TornadoInstance {
+  id: string;
+  x: number; // Continuous grid coordinates
+  y: number;
+  targetX: number;
+  targetY: number;
+  radius: number; // Damage radius in tiles
+  speed: number;
+  life: number;
+  maxLife: number;
+  rotation: number;
+}
+
+export interface EarthquakeInstance {
+  id: string;
+  epicenterX: number;
+  epicenterY: number;
+  magnitude: number; // e.g. 7.2
+  duration: number; // Frames remaining
+  maxDuration: number;
+  faultLines: Array<{ x1: number; y1: number; x2: number; y2: number }>;
+}
+
+export interface MeteorInstance {
+  id: string;
+  startX: number;
+  startY: number;
+  targetX: number;
+  targetY: number;
+  currentX: number;
+  currentY: number;
+  altitude: number; // Drops from 150 to 0
+  speed: number;
+  exploded: boolean;
+  blastRadius: number;
+  explosionLife: number; // Frames remaining of blast effect
+}
+
 export interface BuildingData {
   id: string;
   zone: ZoneType;
@@ -91,6 +135,7 @@ export interface BuildingData {
   fireTimer: number;
   abandoned: boolean;
   style: number;
+  isRubble?: boolean;
 }
 
 export interface Tile {
@@ -106,6 +151,8 @@ export interface Tile {
   connectedToHighway: boolean;
   isBridge?: boolean;
   isRamp?: boolean;
+  isRubble?: boolean;
+  damaged?: boolean;
 
   // Simulation layers (0 to 100)
   landValue: number;

@@ -575,6 +575,186 @@ class SoundManager {
     noise.start(t);
   }
 
+  // Civil Defense / Municipal Air Raid Warning Siren
+  public playCivilDefenseSiren() {
+    if (this.isMuted) return;
+    this.initCtx();
+    if (!this.ctx || !this.masterGain) return;
+
+    const t = this.ctx.currentTime;
+    const dur = 3.5;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sawtooth';
+    // Frequency sweeps up and down
+    osc.frequency.setValueAtTime(440, t);
+    osc.frequency.linearRampToValueAtTime(780, t + 0.8);
+    osc.frequency.linearRampToValueAtTime(440, t + 1.6);
+    osc.frequency.linearRampToValueAtTime(820, t + 2.4);
+    osc.frequency.linearRampToValueAtTime(400, t + 3.4);
+
+    // Lowpass filter to emulate distance & horn enclosure
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1200, t);
+
+    gain.gain.setValueAtTime(0.001, t);
+    gain.gain.linearRampToValueAtTime(0.06, t + 0.2);
+    gain.gain.setValueAtTime(0.06, t + dur - 0.4);
+    gain.gain.linearRampToValueAtTime(0.0001, t + dur);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.masterGain);
+
+    osc.start(t);
+    osc.stop(t + dur);
+  }
+
+  // Deep Sub-Bass Earthquake Seismic Rumble
+  public playEarthquakeRumble() {
+    if (this.isMuted) return;
+    this.initCtx();
+    if (!this.ctx || !this.masterGain) return;
+
+    const t = this.ctx.currentTime;
+    const dur = 3.0;
+
+    // 1. Sub-bass ground tremor oscillator
+    const subOsc = this.ctx.createOscillator();
+    subOsc.type = 'triangle';
+    subOsc.frequency.setValueAtTime(45, t);
+    subOsc.frequency.linearRampToValueAtTime(32, t + dur);
+
+    const subGain = this.ctx.createGain();
+    subGain.gain.setValueAtTime(0.001, t);
+    subGain.gain.linearRampToValueAtTime(0.12, t + 0.4);
+    subGain.gain.setValueAtTime(0.10, t + dur - 0.6);
+    subGain.gain.linearRampToValueAtTime(0.0001, t + dur);
+
+    subOsc.connect(subGain);
+    subGain.connect(this.masterGain);
+    subOsc.start(t);
+    subOsc.stop(t + dur);
+
+    // 2. Grinding rock & debris noise
+    const bufferSize = Math.floor(this.ctx.sampleRate * dur);
+    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = noiseBuffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(110, t);
+
+    const noiseGain = this.ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.001, t);
+    noiseGain.gain.linearRampToValueAtTime(0.08, t + 0.3);
+    noiseGain.gain.linearRampToValueAtTime(0.0001, t + dur);
+
+    noise.connect(filter);
+    filter.connect(noiseGain);
+    noiseGain.connect(this.masterGain);
+
+    noise.start(t);
+  }
+
+  // Cyclonic Tornado Wind Vortex Roar
+  public playTornadoRoar() {
+    if (this.isMuted) return;
+    this.initCtx();
+    if (!this.ctx || !this.masterGain) return;
+
+    const t = this.ctx.currentTime;
+    const dur = 2.5;
+
+    const bufferSize = Math.floor(this.ctx.sampleRate * dur);
+    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = noiseBuffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(350, t);
+    filter.frequency.linearRampToValueAtTime(550, t + 1.2);
+    filter.frequency.linearRampToValueAtTime(300, t + dur);
+    filter.Q.setValueAtTime(1.8, t);
+
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.001, t);
+    gain.gain.linearRampToValueAtTime(0.09, t + 0.3);
+    gain.gain.setValueAtTime(0.08, t + dur - 0.5);
+    gain.gain.linearRampToValueAtTime(0.0001, t + dur);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.masterGain);
+
+    noise.start(t);
+  }
+
+  // High-Energy Explosion / Meteor Blast
+  public playExplosion() {
+    if (this.isMuted) return;
+    this.initCtx();
+    if (!this.ctx || !this.masterGain) return;
+
+    const t = this.ctx.currentTime;
+    const dur = 1.8;
+
+    // 1. Initial explosive punch
+    const osc = this.ctx.createOscillator();
+    const oscGain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(160, t);
+    osc.frequency.exponentialRampToValueAtTime(25, t + 0.3);
+
+    oscGain.gain.setValueAtTime(0.18, t);
+    oscGain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+
+    osc.connect(oscGain);
+    oscGain.connect(this.masterGain);
+    osc.start(t);
+    osc.stop(t + 0.35);
+
+    // 2. Lingering blast noise & debris
+    const bufferSize = Math.floor(this.ctx.sampleRate * dur);
+    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = noiseBuffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(450, t);
+    filter.frequency.exponentialRampToValueAtTime(50, t + dur);
+
+    const noiseGain = this.ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.2, t);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+
+    noise.connect(filter);
+    filter.connect(noiseGain);
+    noiseGain.connect(this.masterGain);
+
+    noise.start(t);
+  }
+
   // --- DYNAMIC AMBIENT SOUNDSCAPE ENGINE ---
 
   public startAmbientLoop() {
