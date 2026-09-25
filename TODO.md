@@ -38,15 +38,18 @@ A prioritized development roadmap and feature checklist for expanding **Pixel Ci
   - [x] 2-Lane Paved Streets (standard local road with autotiling & steel bridges).
   - [x] 4-Lane Regional Interstate Highway with concrete median barriers.
   - [x] 4-Lane Downtown Avenues with center medians, cable bridges & +15 land value boost.
-  - [ ] One-way roads and highway on/off ramps.
+  - [ ] Highway on/off ramps and one-way streets.
 - [x] **Traffic & Emergency Vehicles**
   - [x] Moving vans, commuter cars, and yellow taxis navigating between homes and jobs.
   - [x] Interstate freight semi-trucks transporting cargo from the border.
   - [x] Emergency fire trucks and police cruisers with active flashing beacons.
-- [ ] **Public Transit**
-  - [ ] Bus depots, bus stops, and draggable bus transit lines.
+- [x] **Public Transit**
+  - [x] Municipal Bus Depots ($400) and Roadside Bus Stops ($50).
+  - [x] Radial transit coverage network (~8 tiles, scaled by funding & Free Transit ordinance).
+  - [x] Procedural city transit buses with boarding badges and pneumatic air brake SFX.
+  - [x] Transit data heatmap overlay, budget departmental funding slider, and dynamic news bulletins.
+  - [ ] Heavy Rail / Train tracks and passenger/freight train stations.
   - [ ] Underground Subway / Metro layer with tunnels and stations.
-  - [ ] Train tracks and passenger/freight train stations.
 
 ---
 
