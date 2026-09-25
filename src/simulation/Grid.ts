@@ -1,4 +1,4 @@
-import { MAP_SIZE, Tile, TileType, ZoneType } from '../core/Constants.ts';
+import { MAP_SIZE, Tile, TileType, ZoneType, isAnyRoad } from '../core/Constants.ts';
 
 export class Grid {
   public size: number;
@@ -135,7 +135,7 @@ export class Grid {
 
   public updateRoadMask(x: number, y: number) {
     const tile = this.getTile(x, y);
-    if (!tile || (tile.type !== TileType.ROAD && tile.type !== TileType.HIGHWAY)) return;
+    if (!tile || !isAnyRoad(tile.type)) return;
 
     let mask = 0;
     const n = this.getTile(x, y - 1);
@@ -143,7 +143,7 @@ export class Grid {
     const s = this.getTile(x, y + 1);
     const w = this.getTile(x - 1, y);
 
-    const isConnectable = (t: Tile | null) => t && (t.type === TileType.ROAD || t.type === TileType.HIGHWAY);
+    const isConnectable = (t: Tile | null) => t && isAnyRoad(t.type);
 
     if (isConnectable(n)) mask |= 1;
     if (isConnectable(e)) mask |= 2;
@@ -191,7 +191,7 @@ export class Grid {
 
       for (const n of neighbors) {
         const t = n.tile;
-        if (t.type === TileType.ROAD && !t.connectedToHighway) {
+        if (isAnyRoad(t.type) && t.type !== TileType.HIGHWAY && !t.connectedToHighway) {
           t.connectedToHighway = true;
           queue.push(t);
         }
@@ -283,6 +283,13 @@ export class Grid {
           });
         }
 
+        // Downtown Avenues (Boulevard Land Value Boost, Radius 3)
+        if (t.type === TileType.AVENUE) {
+          this.applyRadialEffect(x, y, 3, (target, dist) => {
+            target.landValue = Math.min(100, target.landValue + Math.round(15 * (1 - dist / 3)));
+          });
+        }
+
         // Pollution from Industrial Zones & Coal Power Plants (Radius 9)
         if (t.type === TileType.POWER_PLANT || (t.building && t.building.zone === ZoneType.INDUSTRIAL)) {
           let intensity = t.type === TileType.POWER_PLANT ? 70 : 45;
@@ -332,11 +339,11 @@ export class Grid {
 
   public isAdjacentToRoad(x: number, y: number): boolean {
     const neighbors = this.getNeighbors(x, y);
-    return neighbors.some(n => n.tile.type === TileType.ROAD);
+    return neighbors.some(n => isAnyRoad(n.tile.type));
   }
 
   public isAdjacentToHighwayConnectedRoad(x: number, y: number): boolean {
     const neighbors = this.getNeighbors(x, y);
-    return neighbors.some(n => n.tile.type === TileType.ROAD && n.tile.connectedToHighway);
+    return neighbors.some(n => isAnyRoad(n.tile.type) && n.tile.type !== TileType.HIGHWAY && n.tile.connectedToHighway);
   }
 }

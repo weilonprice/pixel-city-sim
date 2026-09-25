@@ -55,7 +55,7 @@ window.addEventListener('DOMContentLoaded', () => {
   let dragCurrentGridY = -1;
 
   function isDragTool(tool: string): boolean {
-    return tool.startsWith('zone-') || tool === 'road' || tool === 'demolish';
+    return tool.startsWith('zone-') || tool === 'road' || tool === 'dirt-road' || tool === 'avenue' || tool === 'demolish';
   }
 
   function resize() {
@@ -94,6 +94,14 @@ window.addEventListener('DOMContentLoaded', () => {
       let desc = 'Grassland';
       if (tile.type === TileType.WATER) desc = 'River / Deep Water';
       else if (tile.type === TileType.HIGHWAY) desc = 'Interstate 10 (Regional Freeway Connection)';
+      else if (tile.type === TileType.DIRT_ROAD) {
+        const roadType = tile.isBridge ? 'Timber Trestle Bridge' : 'Country Dirt Road';
+        desc = `${roadType} (Hwy:${tile.connectedToHighway ? '✅' : '❌'} P:${tile.powered ? '⚡' : '❌'} W:${tile.watered ? '💧' : '❌'})`;
+      }
+      else if (tile.type === TileType.AVENUE) {
+        const roadType = tile.isBridge ? 'Cable-Stayed Concrete Bridge' : 'Downtown Avenue (4-Lane Boulevard)';
+        desc = `${roadType} (Hwy:${tile.connectedToHighway ? '✅' : '❌'} P:${tile.powered ? '⚡' : '❌'} W:${tile.watered ? '💧' : '❌'})`;
+      }
       else if (tile.type === TileType.ROAD) {
         const roadType = tile.isBridge ? 'Steel Truss Bridge' : 'Paved Road';
         desc = `${roadType} (Hwy:${tile.connectedToHighway ? '✅' : '❌'} P:${tile.powered ? '⚡' : '❌'} W:${tile.watered ? '💧' : '❌'})`;
@@ -160,7 +168,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
       if (dragStartGridX === dragCurrentGridX && dragStartGridY === dragCurrentGridY) {
         applyTool(dragStartGridX, dragStartGridY);
-      } else if (tool === 'road') {
+      } else if (tool === 'road' || tool === 'dirt-road' || tool === 'avenue') {
         // Line road dragging along dominant axis
         const dx = dragCurrentGridX - dragStartGridX;
         const dy = dragCurrentGridY - dragStartGridY;
@@ -262,6 +270,30 @@ window.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // Dirt Road & Timber Bridge placement
+    if (tool === 'dirt-road') {
+      if (tile.type === TileType.DIRT_ROAD || tile.type === TileType.HIGHWAY) return;
+
+      const isWater = tile.type === TileType.WATER;
+      const cost = isWater ? COSTS.DIRT_BRIDGE : COSTS.DIRT_ROAD;
+
+      if (engine.funds < cost) {
+        sounds.playError();
+        hud.showToast(isWater ? "Not enough funds for Timber Bridge ($25)!" : "Not enough funds for Dirt Road ($5)!");
+        return;
+      }
+
+      engine.funds -= cost;
+      sounds.playBuild();
+      tile.type = TileType.DIRT_ROAD;
+      tile.isBridge = isWater;
+      tile.elevation = 0;
+      tile.zone = ZoneType.NONE;
+      tile.building = undefined;
+      grid.updateRoadAndNeighbors(x, y);
+      return;
+    }
+
     // Road & Bridge placement
     if (tool === 'road') {
       if (tile.type === TileType.ROAD || tile.type === TileType.HIGHWAY) return;
@@ -283,6 +315,31 @@ window.addEventListener('DOMContentLoaded', () => {
       tile.zone = ZoneType.NONE;
       tile.building = undefined;
       grid.updateRoadAndNeighbors(x, y);
+      return;
+    }
+
+    // Downtown Avenue & Cable Bridge placement
+    if (tool === 'avenue') {
+      if (tile.type === TileType.AVENUE || tile.type === TileType.HIGHWAY) return;
+
+      const isWater = tile.type === TileType.WATER;
+      const cost = isWater ? COSTS.AVENUE_BRIDGE : COSTS.AVENUE;
+
+      if (engine.funds < cost) {
+        sounds.playError();
+        hud.showToast(isWater ? "Not enough funds for Cable Bridge ($100)!" : "Not enough funds for Avenue ($25)!");
+        return;
+      }
+
+      engine.funds -= cost;
+      sounds.playBuild();
+      tile.type = TileType.AVENUE;
+      tile.isBridge = isWater;
+      tile.elevation = 0;
+      tile.zone = ZoneType.NONE;
+      tile.building = undefined;
+      grid.updateRoadAndNeighbors(x, y);
+      grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation, engine.ordinances);
       return;
     }
 

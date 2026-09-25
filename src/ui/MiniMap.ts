@@ -85,8 +85,12 @@ export class MiniMap {
           color = '#1d4ed8'; // River
         } else if (t.type === TileType.HIGHWAY) {
           color = '#e2e8f0'; // Interstate 10
+        } else if (t.type === TileType.AVENUE) {
+          color = t.isBridge ? '#f8fafc' : '#cbd5e1'; // 4-Lane Avenue
         } else if (t.type === TileType.ROAD) {
-          color = t.isBridge ? '#cbd5e1' : '#94a3b8'; // Road / Bridge
+          color = t.isBridge ? '#94a3b8' : '#64748b'; // Paved Road
+        } else if (t.type === TileType.DIRT_ROAD) {
+          color = t.isBridge ? '#a16207' : '#855b32'; // Dirt Road
         } else if (t.type === TileType.PARK) {
           color = '#15803d';
         } else if (t.type === TileType.POWER_PLANT || t.type === TileType.WATER_PUMP) {

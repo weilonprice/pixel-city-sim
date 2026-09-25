@@ -57,31 +57,38 @@ async function runPlaytest() {
 
   // 2. Test All Toolbar Buttons
   console.log('\n2. Testing Toolbar buttons clickability...');
-  const tools = ['road', 'zone-r', 'zone-c', 'zone-i', 'power-plant', 'water-pump', 'fire-station', 'police-station', 'hospital', 'school', 'park', 'demolish', 'inspect'];
+  const tools = ['dirt-road', 'road', 'avenue', 'zone-r', 'zone-c', 'zone-i', 'power-plant', 'water-pump', 'fire-station', 'police-station', 'hospital', 'school', 'park', 'demolish', 'inspect'];
   for (const tool of tools) {
     await page.click(`button[data-tool="${tool}"]`);
     const activeTool = await page.$eval('.tool-btn.active', el => el.getAttribute('data-tool'));
     if (activeTool !== tool) throw new Error(`Tool ${tool} failed to activate`);
   }
-  console.log('   ✅ All 13 toolbar buttons respond and toggle properly.');
+  console.log('   ✅ All 15 toolbar buttons respond and toggle properly.');
 
   // 3. Playtest Construction: Building a Living Town
-  console.log('\n3. Player Construction: Laying roads, zones, and utilities...');
+  console.log('\n3. Player Construction: Laying roads, avenues, dirt tracks, zones, and utilities...');
 
   const constructCode = `(() => {
     const game = window.game;
     if (!game) return { success: false, reason: 'Game context not mounted' };
 
-    // A. Connect road south from Interstate 10 starter off-ramp (x=30, y=18)
+    // A. Connect paved road south from Interstate 10 starter off-ramp (x=30, y=18)
     game.hud.activeTool = 'road';
     for (let y = 18; y <= 28; y++) {
       game.applyTool(30, y);
     }
-    // Main cross boulevard at y = 22
+    // Main cross Downtown Avenue at y = 22
+    game.hud.activeTool = 'avenue';
     for (let x = 20; x <= 40; x++) {
       game.applyTool(x, 22);
     }
+    // Country Dirt Road connecting out west at y = 28
+    game.hud.activeTool = 'dirt-road';
+    for (let x = 16; x <= 30; x++) {
+      game.applyTool(x, 28);
+    }
     // Secondary cross street at y = 25
+    game.hud.activeTool = 'road';
     for (let x = 24; x <= 36; x++) {
       game.applyTool(x, 25);
     }
@@ -141,8 +148,8 @@ async function runPlaytest() {
       game.applyTool(x, 23);
     }
 
-    // G. Build Bridge over River (River is around x=45..49, y=22)
-    game.hud.activeTool = 'road';
+    // G. Build Cable-Stayed Avenue Bridge over River (River is around x=45..49, y=22)
+    game.hud.activeTool = 'avenue';
     for (let x = 41; x <= 54; x++) {
       game.applyTool(x, 22);
     }
@@ -151,14 +158,37 @@ async function runPlaytest() {
     game.camera.centerOnTile(30, 23, 1280, 700);
     game.camera.zoom = 1.35;
 
+    const avenueTile = game.grid.getTile(25, 22);
+    const dirtRoadTile = game.grid.getTile(20, 28);
+    const pavedRoadTile = game.grid.getTile(30, 20);
+
     return {
       success: true,
-      fundsAfterBuild: game.engine.funds
+      fundsAfterBuild: game.engine.funds,
+      avenueType: avenueTile ? avenueTile.type : null,
+      dirtRoadType: dirtRoadTile ? dirtRoadTile.type : null,
+      pavedRoadType: pavedRoadTile ? pavedRoadTile.type : null,
+      avenueConnected: avenueTile ? avenueTile.connectedToHighway : false,
+      dirtConnected: dirtRoadTile ? dirtRoadTile.connectedToHighway : false
     };
   })()`;
 
-  const constructTownResult = await page.evaluate(constructCode) as { success: boolean; fundsAfterBuild: number };
+  const constructTownResult = await page.evaluate(constructCode) as {
+    success: boolean;
+    fundsAfterBuild: number;
+    avenueType: string;
+    dirtRoadType: string;
+    pavedRoadType: string;
+    avenueConnected: boolean;
+    dirtConnected: boolean;
+  };
   console.log(`   ✅ Construction completed. Remaining funds: $${constructTownResult.fundsAfterBuild.toLocaleString()}`);
+  console.log(`   Road Hierarchy Verified: Avenue=${constructTownResult.avenueType} (Hwy:${constructTownResult.avenueConnected ? '✅' : '❌'}), Dirt=${constructTownResult.dirtRoadType} (Hwy:${constructTownResult.dirtConnected ? '✅' : '❌'}), Paved=${constructTownResult.pavedRoadType}`);
+
+  if (constructTownResult.avenueType !== 'AVENUE') throw new Error(`Expected AVENUE type, got ${constructTownResult.avenueType}`);
+  if (constructTownResult.dirtRoadType !== 'DIRT_ROAD') throw new Error(`Expected DIRT_ROAD type, got ${constructTownResult.dirtRoadType}`);
+  if (constructTownResult.pavedRoadType !== 'ROAD') throw new Error(`Expected ROAD type, got ${constructTownResult.pavedRoadType}`);
+  if (!constructTownResult.avenueConnected || !constructTownResult.dirtConnected) throw new Error('Avenue or Dirt Road failed to connect to highway!');
 
   // Take screenshot immediately after layout
   await page.screenshot({ path: path.join(projectRoot, 'playtest_step1_layout.png') });
@@ -446,7 +476,22 @@ async function runPlaytest() {
   if (restoredWeatherBadge !== 'Storm') {
     throw new Error(`Weather badge UI not updated after load! Expected Storm, got ${restoredWeatherBadge}`);
   }
-  console.log('   ✅ Save & Load verified with exact state, budget, weather & ordinances restoration.');
+
+  const restoredRoadTypes = await page.evaluate(`(() => {
+    const g = window.game;
+    return {
+      avenueType: g.grid.getTile(25, 22)?.type,
+      dirtRoadType: g.grid.getTile(20, 28)?.type,
+      pavedRoadType: g.grid.getTile(30, 20)?.type
+    };
+  })()`) as { avenueType: string; dirtRoadType: string; pavedRoadType: string };
+
+  if (restoredRoadTypes.avenueType !== 'AVENUE' || restoredRoadTypes.dirtRoadType !== 'DIRT_ROAD' || restoredRoadTypes.pavedRoadType !== 'ROAD') {
+    throw new Error(`Road hierarchy failed to persist! Got: ave=${restoredRoadTypes.avenueType}, dirt=${restoredRoadTypes.dirtRoadType}, road=${restoredRoadTypes.pavedRoadType}`);
+  }
+
+  console.log(`   Restored Road Hierarchy: Avenue=${restoredRoadTypes.avenueType}, Dirt Road=${restoredRoadTypes.dirtRoadType}, Paved Road=${restoredRoadTypes.pavedRoadType}`);
+  console.log('   ✅ Save & Load verified with exact state, budget, weather, ordinances & road hierarchy restoration.');
 
   // 11. Test Ambient Audio & Mute Controls
   console.log('\n11. Testing Audio Mute Controls & Ambient Soundscape...');
