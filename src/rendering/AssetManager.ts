@@ -34,7 +34,18 @@ export class AssetManager {
       'police_car',
       'bus_depot',
       'bus_stop',
-      'city_bus'
+      'city_bus',
+      'train_station',
+      'train_locomotive',
+      'mayors_mansion',
+      'city_hall',
+      'grand_central',
+      'horizon_residence',
+      'apex_pinnacle',
+      'corporate_plaza',
+      'world_trade_tower',
+      'biotech_campus',
+      'aerospace_factory'
     ];
 
     for (const key of assetKeys) {
