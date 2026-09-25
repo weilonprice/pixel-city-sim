@@ -1390,6 +1390,14 @@ export class PixelRenderer {
     const z = this.camera.zoom;
     const ctx = this.ctx;
 
+    if (assetManager.hasSprite('mayors_mansion')) {
+      const img = assetManager.getSprite('mayors_mansion')!;
+      const w = img.naturalWidth * z;
+      const h = img.naturalHeight * z;
+      ctx.drawImage(img, sx - w / 2, sy + hh - h, w, h);
+      return;
+    }
+
     // 1. Manicured Estate Grounds & Brick Courtyard
     ctx.fillStyle = '#1e3f1a';
     ctx.beginPath();
@@ -1531,6 +1539,14 @@ export class PixelRenderer {
     const z = this.camera.zoom;
     const ctx = this.ctx;
 
+    if (assetManager.hasSprite('city_hall')) {
+      const img = assetManager.getSprite('city_hall')!;
+      const w = img.naturalWidth * z;
+      const h = img.naturalHeight * z;
+      ctx.drawImage(img, sx - w / 2, sy + hh - h, w, h);
+      return;
+    }
+
     // 1. Classical Neoclassical Monumental Granite Steps & Plaza
     ctx.fillStyle = '#cbd5e1';
     ctx.beginPath();
@@ -1664,6 +1680,14 @@ export class PixelRenderer {
     const z = this.camera.zoom;
     const ctx = this.ctx;
 
+    if (assetManager.hasSprite('grand_central')) {
+      const img = assetManager.getSprite('grand_central')!;
+      const w = img.naturalWidth * z;
+      const h = img.naturalHeight * z;
+      ctx.drawImage(img, sx - w / 2, sy + hh - h, w, h);
+      return;
+    }
+
     // 1. Beaux-Arts Limestone Concourse Structure
     const concourseH = 46 * z;
     this.drawIsometricBox(sx, sy - 4 * z, hw * 0.88, hh * 0.75, concourseH, '#f5ebe0', '#e3d5ca', '#d5bdaf');
@@ -1792,13 +1816,11 @@ export class PixelRenderer {
     const level = b.level;
     const style = b.style;
 
-    const spriteKey = level <= 3 ? (
-      b.zone === ZoneType.RESIDENTIAL
-        ? (level === 1 ? 'house_cottage' : (level === 2 ? 'townhouse' : 'apartment_tower'))
-        : (b.zone === ZoneType.COMMERCIAL
-          ? (level === 1 ? 'corner_diner' : (level === 2 ? 'office_building' : 'skyscraper'))
-          : (level === 1 ? 'warehouse' : 'factory'))
-    ) : null;
+    const spriteKey = b.zone === ZoneType.RESIDENTIAL
+      ? (level === 1 ? 'house_cottage' : (level === 2 ? 'townhouse' : (level === 3 ? 'apartment_tower' : (level === 4 ? 'horizon_residence' : 'apex_pinnacle'))))
+      : (b.zone === ZoneType.COMMERCIAL
+        ? (level === 1 ? 'corner_diner' : (level === 2 ? 'office_building' : (level === 3 ? 'skyscraper' : (level === 4 ? 'corporate_plaza' : 'world_trade_tower'))))
+        : (level === 1 ? 'warehouse' : (level === 2 ? 'factory' : (level === 3 ? 'factory' : (level === 4 ? 'biotech_campus' : 'aerospace_factory')))));
 
     if (spriteKey && assetManager.hasSprite(spriteKey)) {
       const img = assetManager.getSprite(spriteKey)!;
@@ -3012,13 +3034,19 @@ export class PixelRenderer {
 
       // Heavy Rail Passenger Locomotive & Coach
       if (v.isTrain) {
-        const trainW = 32 * z;
-        const trainH = 12 * z;
-        const trainY = sy - 6 * z;
+        if (assetManager.hasSprite('train_locomotive')) {
+          const img = assetManager.getSprite('train_locomotive')!;
+          const w = 38 * z;
+          const h = 24 * z;
+          this.ctx.drawImage(img, sx - w / 2, sy - h * 0.7, w, h);
+        } else {
+          const trainW = 32 * z;
+          const trainH = 12 * z;
+          const trainY = sy - 6 * z;
 
-        // Train shadow on tracks
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-        this.ctx.fillRect(sx - trainW / 2 + 2 * z, trainY + trainH - 2 * z, trainW - 2 * z, 4 * z);
+          // Train shadow on tracks
+          this.ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+          this.ctx.fillRect(sx - trainW / 2 + 2 * z, trainY + trainH - 2 * z, trainW - 2 * z, 4 * z);
 
         // Locomotive Body (Dark Charcoal / Navy Steel)
         this.ctx.fillStyle = '#1e293b';
@@ -3075,6 +3103,7 @@ export class PixelRenderer {
         this.ctx.fillRect(sx - trainW / 2 + 10 * z, trainY + trainH - 1 * z, 3.5 * z, 2.5 * z);
         this.ctx.fillRect(coachX + 2 * z, trainY + trainH - 1 * z, 3.5 * z, 2.5 * z);
         this.ctx.fillRect(coachX + 8 * z, trainY + trainH - 1 * z, 3.5 * z, 2.5 * z);
+        }
 
         // Passenger boarding indicator when dwelling at station
         if (v.dwellTimer && v.dwellTimer > 0) {

@@ -175,6 +175,107 @@ const ASSET_QUEUE: AssetRequest[] = [
     width: 48,
     height: 48,
     direction: 'south-east'
+  },
+  // 7. Public Transit & Rail (Batch 3)
+  {
+    id: 'bus_depot',
+    description: 'Isometric municipal bus transit depot garage building with two large garage bays and administrative office, clean 16-bit pixel art',
+    width: 64,
+    height: 64,
+    direction: 'south-east'
+  },
+  {
+    id: 'bus_stop',
+    description: 'Isometric roadside glass passenger bus stop shelter with bench and transit sign, clean 16-bit pixel art',
+    width: 48,
+    height: 48,
+    direction: 'south-east'
+  },
+  {
+    id: 'city_bus',
+    description: 'Isometric modern blue and white city public transit passenger bus, clean 16-bit pixel art',
+    width: 48,
+    height: 48,
+    direction: 'south-east'
+  },
+  {
+    id: 'train_station',
+    description: 'Isometric classic passenger train station building with brick facade, platform canopy, and small clock tower, clean 16-bit pixel art',
+    width: 64,
+    height: 64,
+    direction: 'south-east'
+  },
+  {
+    id: 'train_locomotive',
+    description: 'Isometric sleek diesel passenger train locomotive engine with silver and red livery, clean 16-bit pixel art',
+    width: 64,
+    height: 48,
+    direction: 'south-east'
+  },
+  // 8. Civic Landmarks (Batch 3)
+  {
+    id: 'mayors_mansion',
+    description: 'Isometric stately Victorian mayoral manor mansion with gabled roof, wraparound porch, and manicured hedge garden, clean 16-bit pixel art',
+    width: 64,
+    height: 64,
+    direction: 'south-east'
+  },
+  {
+    id: 'city_hall',
+    description: 'Isometric majestic neoclassical municipal city hall building with grand central dome, marble steps, and stone columns, clean 16-bit pixel art',
+    width: 64,
+    height: 64,
+    direction: 'south-east'
+  },
+  {
+    id: 'grand_central',
+    description: 'Isometric monumental grand central terminal train station with grand arched glass facade and brass roof, clean 16-bit pixel art',
+    width: 64,
+    height: 64,
+    direction: 'south-east'
+  },
+  // 9. High-Density Skylines Tier 4 & Tier 5 (Batch 3)
+  {
+    id: 'horizon_residence',
+    description: 'Isometric luxury high-rise condominium skyscraper with glass balconies, rooftop terrace, and subtle lighting, clean 16-bit pixel art',
+    width: 64,
+    height: 64,
+    direction: 'south-east'
+  },
+  {
+    id: 'apex_pinnacle',
+    description: 'Isometric futuristic apex glass residential megatower skyscraper with angular spire and rooftop beacon, clean 16-bit pixel art',
+    width: 64,
+    height: 64,
+    direction: 'south-east'
+  },
+  {
+    id: 'corporate_plaza',
+    description: 'Isometric modern corporate financial plaza skyscraper with emerald reflective curtain glass windows and rooftop helipad, clean 16-bit pixel art',
+    width: 64,
+    height: 64,
+    direction: 'south-east'
+  },
+  {
+    id: 'world_trade_tower',
+    description: 'Isometric towering commercial skyscraper with iconic dark steel X-bracing and rooftop broadcast mast, clean 16-bit pixel art',
+    width: 64,
+    height: 64,
+    direction: 'south-east'
+  },
+  {
+    id: 'biotech_campus',
+    description: 'Isometric high-tech biotechnology clean research campus with solar panels, glass atrium, and landscaped courtyard, clean 16-bit pixel art',
+    width: 64,
+    height: 64,
+    direction: 'south-east'
+  },
+  {
+    id: 'aerospace_factory',
+    description: 'Isometric advanced aerospace robotics megafactory with futuristic geodesic glass dome and clean assembly bays, clean 16-bit pixel art',
+    width: 64,
+    height: 64,
+    direction: 'south-east'
   }
 ];
 
@@ -255,12 +356,33 @@ async function main() {
 
   let successCount = 0;
   for (const asset of ASSET_QUEUE) {
-    try {
-      await generateAsset(token, asset, outputDir);
+    const outPath = path.join(outputDir, `${asset.id}.png`);
+    if (fs.existsSync(outPath) && !process.argv.includes('--force')) {
+      console.log(`   ⏩ [${asset.id}] Already exists at public/assets/sprites/${asset.id}.png, skipping.`);
       successCount++;
-    } catch (err: unknown) {
-      console.error(`   ⚠️ Failed to generate ${asset.id}:`, (err as Error).message);
+      continue;
     }
+
+    let retries = 4;
+    while (retries > 0) {
+      try {
+        await generateAsset(token, asset, outputDir);
+        successCount++;
+        break;
+      } catch (err: unknown) {
+        retries--;
+        const msg = (err as Error).message;
+        if (retries > 0 && (msg.includes('429') || msg.includes('concurrent') || msg.includes('rate'))) {
+          console.log(`   ⏳ Concurrency limit reached for ${asset.id}, waiting 8s before retry (${retries} left)...`);
+          await new Promise(r => setTimeout(r, 8000));
+        } else {
+          console.error(`   ⚠️ Failed to generate ${asset.id}:`, msg);
+          break;
+        }
+      }
+    }
+    // Respectful spacing between generations
+    await new Promise(r => setTimeout(r, 3500));
   }
 
   console.log(`\n🎉 Done! Successfully generated and saved ${successCount}/${ASSET_QUEUE.length} assets.`);
