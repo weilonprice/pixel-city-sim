@@ -4,6 +4,14 @@ import { Grid } from '../simulation/Grid.ts';
 import { SimulationEngine } from '../simulation/SimulationEngine.ts';
 import { assetManager } from './AssetManager.ts';
 
+export interface DragPreview {
+  tool: string;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+}
+
 interface Particle {
   x: number;
   y: number;
@@ -43,7 +51,7 @@ export class PixelRenderer {
     this.engine = engine;
   }
 
-  public render(hoverGridX: number, hoverGridY: number, activeTool: string) {
+  public render(hoverGridX: number, hoverGridY: number, activeTool: string, dragPreview?: DragPreview) {
     this.animFrame++;
     const { width, height } = this.ctx.canvas;
 
@@ -64,10 +72,15 @@ export class PixelRenderer {
 
         this.renderTile(tile);
 
-        if (x === hoverGridX && y === hoverGridY) {
+        if (!dragPreview && x === hoverGridX && y === hoverGridY) {
           this.renderHoverHighlight(tile, activeTool);
         }
       }
+    }
+
+    // Render Drag-to-build highlight preview and dimension badge
+    if (dragPreview) {
+      this.renderDragPreview(dragPreview);
     }
 
     // Render vehicles on roads and highway
@@ -110,6 +123,15 @@ export class PixelRenderer {
     // 3. Render Zone Overlays
     if (tile.zone !== ZoneType.NONE && !tile.building) {
       this.drawZoneOverlay(sx, sy, halfW, halfH, tile.zone);
+
+      // Warning badge if disconnected!
+      const hasRoad = this.grid.isAdjacentToRoad(tile.x, tile.y);
+      const hasHwy = this.grid.isAdjacentToHighwayConnectedRoad(tile.x, tile.y);
+      if (!hasRoad && (this.animFrame % 60 < 40)) {
+        this.drawWarningIcon(sx, sy - 15 * this.camera.zoom, '🚫', '#ef4444');
+      } else if (!hasHwy && (this.animFrame % 60 < 40)) {
+        this.drawWarningIcon(sx, sy - 15 * this.camera.zoom, '⚠️', '#f59e0b');
+      }
     }
 
     // 4. Render Highway & Bridges & Roads
@@ -470,6 +492,13 @@ export class PixelRenderer {
 
   private drawFireStation(sx: number, sy: number, hw: number, hh: number) {
     const z = this.camera.zoom;
+    if (assetManager.hasSprite('fire_station')) {
+      const img = assetManager.getSprite('fire_station')!;
+      const w = img.naturalWidth * z;
+      const h = img.naturalHeight * z;
+      this.ctx.drawImage(img, sx - w / 2, sy + hh - h, w, h);
+      return;
+    }
     const height = 34 * z;
     this.drawIsometricBox(sx, sy, hw * 0.75, hh * 0.75, height, '#b91c1c', '#991b1b', '#7f1d1d');
 
@@ -484,6 +513,13 @@ export class PixelRenderer {
 
   private drawPoliceStation(sx: number, sy: number, hw: number, hh: number) {
     const z = this.camera.zoom;
+    if (assetManager.hasSprite('police_station')) {
+      const img = assetManager.getSprite('police_station')!;
+      const w = img.naturalWidth * z;
+      const h = img.naturalHeight * z;
+      this.ctx.drawImage(img, sx - w / 2, sy + hh - h, w, h);
+      return;
+    }
     const height = 34 * z;
     this.drawIsometricBox(sx, sy, hw * 0.75, hh * 0.75, height, '#1e3a8a', '#1e40af', '#172554');
 
@@ -502,6 +538,13 @@ export class PixelRenderer {
 
   private drawHospital(sx: number, sy: number, hw: number, hh: number) {
     const z = this.camera.zoom;
+    if (assetManager.hasSprite('hospital')) {
+      const img = assetManager.getSprite('hospital')!;
+      const w = img.naturalWidth * z;
+      const h = img.naturalHeight * z;
+      this.ctx.drawImage(img, sx - w / 2, sy + hh - h, w, h);
+      return;
+    }
     const height = 44 * z;
     this.drawIsometricBox(sx, sy, hw * 0.8, hh * 0.8, height, '#f8fafc', '#e2e8f0', '#cbd5e1');
 
@@ -518,6 +561,13 @@ export class PixelRenderer {
 
   private drawSchool(sx: number, sy: number, hw: number, hh: number) {
     const z = this.camera.zoom;
+    if (assetManager.hasSprite('school')) {
+      const img = assetManager.getSprite('school')!;
+      const w = img.naturalWidth * z;
+      const h = img.naturalHeight * z;
+      this.ctx.drawImage(img, sx - w / 2, sy + hh - h, w, h);
+      return;
+    }
     const height = 30 * z;
     this.drawIsometricBox(sx, sy, hw * 0.75, hh * 0.75, height, '#c2410c', '#9a3412', '#7c2d12');
 
@@ -921,14 +971,160 @@ export class PixelRenderer {
 
   private drawWarningIcon(sx: number, sy: number, symbol: string, color: string) {
     const ctx = this.ctx;
+    const z = this.camera.zoom;
+    const bob = Math.sin(this.animFrame / 8) * 3 * z;
+    const y = sy + bob;
+
     ctx.save();
-    ctx.font = `${Math.max(14, Math.floor(14 * this.camera.zoom))}px sans-serif`;
+    // Pill / circle badge background
+    const radius = 10 * z;
+    ctx.fillStyle = 'rgba(20, 20, 32, 0.9)';
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(1.5, 1.5 * z);
+    ctx.beginPath();
+    ctx.arc(sx, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.font = `${Math.max(10, Math.floor(11 * z))}px sans-serif`;
     ctx.fillStyle = color;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.shadowColor = '#000';
-    ctx.shadowBlur = 4;
-    ctx.fillText(symbol, sx, sy);
+    ctx.fillText(symbol, sx, y);
+    ctx.restore();
+  }
+
+  private renderDragPreview(preview: DragPreview) {
+    const { tool, startX, startY, endX, endY } = preview;
+    const ctx = this.ctx;
+    const z = this.camera.zoom;
+    const halfW = (TILE_WIDTH / 2) * z;
+    const halfH = (TILE_HEIGHT / 2) * z;
+
+    const affectedTiles: { x: number; y: number }[] = [];
+
+    if (tool === 'road') {
+      const dx = endX - startX;
+      const dy = endY - startY;
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        const step = dx >= 0 ? 1 : -1;
+        for (let x = startX; x !== endX + step; x += step) {
+          if (this.grid.isValidCoord(x, startY)) {
+            affectedTiles.push({ x, y: startY });
+          }
+        }
+      } else {
+        const step = dy >= 0 ? 1 : -1;
+        for (let y = startY; y !== endY + step; y += step) {
+          if (this.grid.isValidCoord(startX, y)) {
+            affectedTiles.push({ x: startX, y });
+          }
+        }
+      }
+    } else {
+      // Rectangle drag for zones and demolish
+      const minX = Math.min(startX, endX);
+      const maxX = Math.max(startX, endX);
+      const minY = Math.min(startY, endY);
+      const maxY = Math.max(startY, endY);
+
+      for (let x = minX; x <= maxX; x++) {
+        for (let y = minY; y <= maxY; y++) {
+          if (this.grid.isValidCoord(x, y)) {
+            affectedTiles.push({ x, y });
+          }
+        }
+      }
+    }
+
+    if (affectedTiles.length === 0) return;
+
+    let strokeColor = '#3b82f6';
+    let fillColor = 'rgba(59, 130, 246, 0.4)';
+    let toolName = 'Zoning';
+    let unitCost = 50;
+
+    if (tool === 'zone-r') {
+      strokeColor = '#22c55e';
+      fillColor = 'rgba(34, 197, 94, 0.45)';
+      toolName = 'Residential Zone';
+      unitCost = 50;
+    } else if (tool === 'zone-c') {
+      strokeColor = '#3b82f6';
+      fillColor = 'rgba(59, 130, 246, 0.45)';
+      toolName = 'Commercial Zone';
+      unitCost = 50;
+    } else if (tool === 'zone-i') {
+      strokeColor = '#eab308';
+      fillColor = 'rgba(234, 179, 8, 0.45)';
+      toolName = 'Industrial Zone';
+      unitCost = 50;
+    } else if (tool === 'road') {
+      strokeColor = '#f59e0b';
+      fillColor = 'rgba(245, 158, 11, 0.45)';
+      toolName = 'Road Network';
+      unitCost = 10;
+    } else if (tool === 'demolish') {
+      strokeColor = '#ef4444';
+      fillColor = 'rgba(239, 68, 68, 0.45)';
+      toolName = 'Bulldozer';
+      unitCost = 5;
+    }
+
+    // Highlight each affected tile diamond
+    for (const t of affectedTiles) {
+      const tile = this.grid.getTile(t.x, t.y);
+      const elevation = tile ? tile.elevation : 0;
+      const { x: sx, y: sy } = this.camera.worldToScreen(t.x, t.y, elevation);
+
+      ctx.save();
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = Math.max(2, 2 * z);
+      ctx.fillStyle = fillColor;
+
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - halfH);
+      ctx.lineTo(sx + halfW, sy);
+      ctx.lineTo(sx, sy + halfH);
+      ctx.lineTo(sx - halfW, sy);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Floating Tooltip Badge near endpoint
+    const endTile = this.grid.getTile(endX, endY);
+    const endElev = endTile ? endTile.elevation : 0;
+    const { x: tooltipX, y: tooltipY } = this.camera.worldToScreen(endX, endY, endElev);
+
+    const count = affectedTiles.length;
+    const totalCost = count * unitCost;
+    const w = Math.abs(endX - startX) + 1;
+    const h = Math.abs(endY - startY) + 1;
+    const dimText = tool === 'road' ? `${count} tiles` : `${w}×${h} (${count} tiles)`;
+    const text = `${toolName} • ${dimText} • $${totalCost.toLocaleString()}`;
+
+    ctx.save();
+    ctx.font = `bold ${Math.max(10, Math.floor(11 * z))}px 'Press Start 2P', monospace`;
+    const textWidth = ctx.measureText(text).width;
+    const badgeW = textWidth + 24 * z;
+    const badgeH = 26 * z;
+    const badgeX = tooltipX - badgeW / 2;
+    const badgeY = tooltipY - 32 * z;
+
+    ctx.fillStyle = 'rgba(20, 20, 32, 0.92)';
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = Math.max(2, 2 * z);
+    ctx.beginPath();
+    ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 6 * z);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, tooltipX, badgeY + badgeH / 2);
     ctx.restore();
   }
 
@@ -1078,8 +1274,16 @@ export class PixelRenderer {
 
       // Emergency flashing siren
       if (v.isEmergency) {
-        this.ctx.fillStyle = v.color;
-        this.ctx.fillRect(sx - 3 * z, sy - 2 * z, 6 * z, 4 * z);
+        const spriteKey = v.isEmergency === 'fire' ? 'fire_truck' : 'police_car';
+        if (assetManager.hasSprite(spriteKey)) {
+          const img = assetManager.getSprite(spriteKey)!;
+          const w = 22 * z;
+          const h = 22 * z;
+          this.ctx.drawImage(img, sx - w / 2, sy - h * 0.7, w, h);
+        } else {
+          this.ctx.fillStyle = v.color;
+          this.ctx.fillRect(sx - 3 * z, sy - 2 * z, 6 * z, 4 * z);
+        }
 
         const sirenColor = (this.animFrame % 16 < 8) ? '#ef4444' : '#38bdf8';
         this.ctx.fillStyle = sirenColor;
