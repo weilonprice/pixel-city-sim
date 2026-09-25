@@ -1,4 +1,5 @@
 import { SimulationEngine } from '../simulation/SimulationEngine.ts';
+import { WeatherType } from '../core/Constants.ts';
 import { sounds } from '../core/SoundEffects.ts';
 
 export class NewsTicker {
@@ -154,7 +155,33 @@ export class NewsTicker {
       list.push("🎓 HONOR ROLL: Local schools rank top in region following expanded education funding!");
     }
 
-    // 4. Population & Growth Milestones
+    // 4. Municipal Ordinances & Policies
+    if (this.engine.ordinances.smokeDetectors) {
+      list.push("🧯 PREVENTATIVE SAFETY: Smoke detector mandate dramatically cuts home fire hazards!");
+    }
+    if (this.engine.ordinances.freeTransit) {
+      list.push("🚌 FREE TRANSIT DAY: Citizens flock to public buses, easing traffic wear on roads!");
+    }
+    if (this.engine.ordinances.cleanEnergy) {
+      list.push("🌱 CLEAN AIR INITIATIVE: Smog scrubbers installed at power stations, blue skies return!");
+    }
+    if (this.engine.ordinances.neighborhoodWatch) {
+      list.push("🚨 NEIGHBORHOOD WATCH: Vigilant citizens report zero burglaries in protected blocks!");
+    }
+    if (this.engine.ordinances.readingCampaign) {
+      list.push("📚 LITERACY SOARING: Public schools report record reading test scores across grades!");
+    }
+
+    // 5. Dynamic Weather Bulletins
+    if (this.engine.weather === WeatherType.RAIN) {
+      list.push("🌧️ WEATHER DESK: Spring showers bring umbrellas and puddle splashing across town.");
+    } else if (this.engine.weather === WeatherType.THUNDERSTORM) {
+      list.push("⛈️ SEVERE THUNDERSTORM: Lightning flashes illuminate the metropolitan skyline!");
+    } else if (this.engine.weather === WeatherType.OVERCAST) {
+      list.push("⛅ WEATHER REPORT: Overcast skies drift over the regional highway corridor.");
+    }
+
+    // 6. Population & Growth Milestones
     if (this.engine.population === 0) {
       list.push("🏙️ Welcome Mayor! Zone residential areas and connect them to Interstate 10 to welcome your first citizens!");
     } else if (this.engine.population < 100) {
@@ -165,7 +192,7 @@ export class NewsTicker {
       list.push(`🌆 Bustling metropolis: Population reaches ${this.engine.population} with ${this.engine.totalJobs} active jobs!`);
     }
 
-    // 5. Classic Humorous Headlines
+    // 7. Classic Humorous Headlines
     list.push(...this.humorHeadlines);
 
     return list;

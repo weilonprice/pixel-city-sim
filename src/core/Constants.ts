@@ -35,6 +35,29 @@ export enum OverlayMode {
   POLLUTION = 'POLLUTION'
 }
 
+export enum WeatherType {
+  CLEAR = 'CLEAR',
+  OVERCAST = 'OVERCAST',
+  RAIN = 'RAIN',
+  THUNDERSTORM = 'THUNDERSTORM'
+}
+
+export interface CityOrdinances {
+  smokeDetectors: boolean;
+  freeTransit: boolean;
+  cleanEnergy: boolean;
+  neighborhoodWatch: boolean;
+  readingCampaign: boolean;
+}
+
+export const ORDINANCE_COSTS: Record<keyof CityOrdinances, number> = {
+  smokeDetectors: 20,
+  freeTransit: 60,
+  cleanEnergy: 40,
+  neighborhoodWatch: 30,
+  readingCampaign: 25
+};
+
 export interface BuildingData {
   id: string;
   zone: ZoneType;

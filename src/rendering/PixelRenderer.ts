@@ -1,8 +1,9 @@
-import { TILE_WIDTH, TILE_HEIGHT, TileType, ZoneType, Tile, OverlayMode } from '../core/Constants.ts';
+import { TILE_WIDTH, TILE_HEIGHT, TileType, ZoneType, Tile, OverlayMode, WeatherType } from '../core/Constants.ts';
 import { Camera } from '../core/Camera.ts';
 import { Grid } from '../simulation/Grid.ts';
 import { SimulationEngine } from '../simulation/SimulationEngine.ts';
 import { assetManager } from './AssetManager.ts';
+import { sounds } from '../core/SoundEffects.ts';
 
 export interface DragPreview {
   tool: string;
@@ -43,6 +44,8 @@ export class PixelRenderer {
   private animFrame: number = 0;
   private particles: Particle[] = [];
   private vehicles: Vehicle[] = [];
+  private rainDrops: { x: number; y: number; speed: number; len: number }[] = [];
+  private lightningFlash: number = 0;
 
   constructor(ctx: CanvasRenderingContext2D, camera: Camera, grid: Grid, engine: SimulationEngine) {
     this.ctx = ctx;
@@ -91,6 +94,9 @@ export class PixelRenderer {
 
     // Apply Day / Night lighting atmosphere & glowing street lights
     this.applyDayNightLighting(width, height);
+
+    // Apply Weather atmosphere & rain / lightning effects
+    this.renderWeatherAtmosphere(width, height);
   }
 
   private renderTile(tile: Tile) {
@@ -1345,6 +1351,81 @@ export class PixelRenderer {
     if (tintColor) {
       this.ctx.fillStyle = tintColor;
       this.ctx.fillRect(0, 0, width, height);
+    }
+  }
+
+  /**
+   * Atmospheric Weather Effects (Overcast tint, pixel rain particles, thunderstorm lightning)
+   */
+  private renderWeatherAtmosphere(width: number, height: number) {
+    const weather = this.engine.weather;
+    if (weather === WeatherType.CLEAR) {
+      this.lightningFlash = 0;
+      return;
+    }
+
+    // 1. Atmospheric Overcast/Storm Ambient Tint
+    if (weather === WeatherType.OVERCAST) {
+      this.ctx.fillStyle = 'rgba(75, 85, 100, 0.16)';
+      this.ctx.fillRect(0, 0, width, height);
+      return;
+    }
+
+    if (weather === WeatherType.RAIN) {
+      this.ctx.fillStyle = 'rgba(30, 45, 70, 0.25)';
+      this.ctx.fillRect(0, 0, width, height);
+    } else if (weather === WeatherType.THUNDERSTORM) {
+      this.ctx.fillStyle = 'rgba(15, 25, 50, 0.40)';
+      this.ctx.fillRect(0, 0, width, height);
+    }
+
+    // 2. Initialize rain particles lazily if needed
+    const dropCount = weather === WeatherType.THUNDERSTORM ? 220 : 130;
+    while (this.rainDrops.length < dropCount) {
+      this.rainDrops.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        speed: 12 + Math.random() * 8,
+        len: 8 + Math.random() * 6
+      });
+    }
+
+    // 3. Render falling rain streaks
+    this.ctx.strokeStyle = weather === WeatherType.THUNDERSTORM ? 'rgba(215, 235, 255, 0.7)' : 'rgba(186, 230, 253, 0.55)';
+    this.ctx.lineWidth = 1;
+    this.ctx.beginPath();
+
+    for (let i = 0; i < dropCount; i++) {
+      const drop = this.rainDrops[i];
+      // Wind drift to the left-down
+      this.ctx.moveTo(drop.x, drop.y);
+      this.ctx.lineTo(drop.x - 2, drop.y + drop.len);
+
+      drop.x -= 2;
+      drop.y += drop.speed;
+
+      // Wrap around
+      if (drop.y > height) {
+        drop.y = -10;
+        drop.x = Math.random() * (width + 50);
+      }
+      if (drop.x < -10) {
+        drop.x = width + 10;
+      }
+    }
+    this.ctx.stroke();
+
+    // 4. Thunderstorm Lightning Flash
+    if (weather === WeatherType.THUNDERSTORM) {
+      if (this.lightningFlash > 0) {
+        this.lightningFlash--;
+        this.ctx.fillStyle = `rgba(255, 255, 255, ${0.45 + Math.random() * 0.25})`;
+        this.ctx.fillRect(0, 0, width, height);
+      } else if (Math.random() < 0.003) {
+        // Trigger sudden flash
+        this.lightningFlash = 3;
+        sounds.playThunder();
+      }
     }
   }
 }

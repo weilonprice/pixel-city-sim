@@ -1,4 +1,4 @@
-import { TileType, ZoneType, Tile, BuildingData, UPKEEP, OverlayMode } from '../core/Constants.ts';
+import { TileType, ZoneType, Tile, BuildingData, UPKEEP, OverlayMode, WeatherType, CityOrdinances, ORDINANCE_COSTS } from '../core/Constants.ts';
 import { Grid } from './Grid.ts';
 import { sounds } from '../core/SoundEffects.ts';
 
@@ -14,6 +14,7 @@ export interface FinancialLedger {
   expenseHealth: number;
   expenseEducation: number;
   expenseUtilities: number;
+  expenseOrdinances: number;
   totalExpenses: number;
 
   netMonthly: number;
@@ -32,6 +33,19 @@ export class SimulationEngine {
 
   // Active Data Overlay
   public overlayMode: OverlayMode = OverlayMode.NORMAL;
+
+  // Weather System
+  public weather: WeatherType = WeatherType.CLEAR;
+  public weatherTimer: number = 0;
+
+  // Municipal Ordinances & Policies
+  public ordinances: CityOrdinances = {
+    smokeDetectors: false,
+    freeTransit: false,
+    cleanEnergy: false,
+    neighborhoodWatch: false,
+    readingCampaign: false
+  };
 
   // Simulation Clock & Day/Night
   public speed: number = 1; // 0, 1, 2, 5
@@ -62,6 +76,12 @@ export class SimulationEngine {
   public onStatsUpdate?: () => void;
   public onNotification?: (msg: string) => void;
 
+  public setWeather(w: WeatherType) {
+    this.weather = w;
+    this.weatherTimer = 0;
+    if (this.onStatsUpdate) this.onStatsUpdate();
+  }
+
   constructor(grid: Grid) {
     this.grid = grid;
   }
@@ -87,15 +107,27 @@ export class SimulationEngine {
         this.gameHour = (this.gameHour + 1) % 24;
       }
 
+      // Weather cycle progression (every 90 ticks)
+      this.weatherTimer++;
+      if (this.weatherTimer >= 90) {
+        this.weatherTimer = 0;
+        const roll = Math.random();
+        if (roll < 0.65) this.weather = WeatherType.CLEAR;
+        else if (roll < 0.80) this.weather = WeatherType.OVERCAST;
+        else if (roll < 0.94) this.weather = WeatherType.RAIN;
+        else this.weather = WeatherType.THUNDERSTORM;
+      }
+
       // 1. Update Utilities & Highway Connectivity
       this.updateUtilities();
 
-      // 2. Recalculate Service Coverages (scaled by funding)
+      // 2. Recalculate Service Coverages (scaled by funding and ordinances)
       this.grid.recalculateServiceCoverages(
         this.fundingFire,
         this.fundingPolice,
         this.fundingHealth,
-        this.fundingEducation
+        this.fundingEducation,
+        this.ordinances
       );
 
       // 3. Process Building Growth & Fire Emergencies (every 5 ticks)
@@ -286,8 +318,11 @@ export class SimulationEngine {
     const taxModC = (9 - this.taxRateC) * 3;
     const taxModI = (9 - this.taxRateI) * 3;
 
-    this.demandR = Math.max(-80, Math.min(100, Math.floor(30 + taxModR + (this.totalJobs - this.population * 0.7) * 1.5)));
-    this.demandC = Math.max(-80, Math.min(100, Math.floor(15 + taxModC + (this.population * 0.35 - this.totalJobs * 0.2))));
+    const transitBonusR = this.ordinances.freeTransit ? 10 : 0;
+    const transitBonusC = this.ordinances.freeTransit ? 15 : 0;
+
+    this.demandR = Math.max(-80, Math.min(100, Math.floor(30 + taxModR + transitBonusR + (this.totalJobs - this.population * 0.7) * 1.5)));
+    this.demandC = Math.max(-80, Math.min(100, Math.floor(15 + taxModC + transitBonusC + (this.population * 0.35 - this.totalJobs * 0.2))));
     this.demandI = Math.max(-80, Math.min(100, Math.floor(25 + taxModI + (this.population * 0.5 - this.totalJobs * 0.6))));
   }
 
@@ -296,6 +331,7 @@ export class SimulationEngine {
    */
   private processFireEmergencies() {
     const size = this.grid.size;
+    const fireRisk = this.ordinances.smokeDetectors ? 0.0003 : 0.0008;
 
     for (let x = 0; x < size; x++) {
       for (let y = 0; y < size; y++) {
@@ -326,7 +362,7 @@ export class SimulationEngine {
           }
         }
         // Small chance of catching fire if lacking fire coverage
-        else if (!b.isConstructing && t.fireCoverage < 15 && Math.random() < 0.0008) {
+        else if (!b.isConstructing && t.fireCoverage < 15 && Math.random() < fireRisk) {
           b.onFire = true;
           b.fireTimer = 0;
           sounds.playError();
@@ -380,14 +416,25 @@ export class SimulationEngine {
       }
     }
 
-    const expenseRoads = Math.round(baseRoads * (this.fundingRoads / 100));
+    let expenseRoads = Math.round(baseRoads * (this.fundingRoads / 100));
+    if (this.ordinances.freeTransit) {
+      expenseRoads = Math.round(expenseRoads * 0.85); // 15% reduction in road maintenance
+    }
+
     const expenseFire = Math.round(baseFire * (this.fundingFire / 100));
     const expensePolice = Math.round(basePolice * (this.fundingPolice / 100));
     const expenseHealth = Math.round(baseHealth * (this.fundingHealth / 100));
     const expenseEducation = Math.round(baseEducation * (this.fundingEducation / 100));
     const expenseUtilities = Math.round(baseUtilities);
 
-    const totalExpenses = expenseRoads + expenseFire + expensePolice + expenseHealth + expenseEducation + expenseUtilities;
+    let expenseOrdinances = 0;
+    if (this.ordinances.smokeDetectors) expenseOrdinances += ORDINANCE_COSTS.smokeDetectors;
+    if (this.ordinances.freeTransit) expenseOrdinances += ORDINANCE_COSTS.freeTransit;
+    if (this.ordinances.cleanEnergy) expenseOrdinances += ORDINANCE_COSTS.cleanEnergy;
+    if (this.ordinances.neighborhoodWatch) expenseOrdinances += ORDINANCE_COSTS.neighborhoodWatch;
+    if (this.ordinances.readingCampaign) expenseOrdinances += ORDINANCE_COSTS.readingCampaign;
+
+    const totalExpenses = expenseRoads + expenseFire + expensePolice + expenseHealth + expenseEducation + expenseUtilities + expenseOrdinances;
     const netMonthly = totalRevenue - totalExpenses;
 
     return {
@@ -401,6 +448,7 @@ export class SimulationEngine {
       expenseHealth,
       expenseEducation,
       expenseUtilities,
+      expenseOrdinances,
       totalExpenses,
       netMonthly
     };
@@ -446,6 +494,8 @@ export class SimulationEngine {
         fundingPolice: this.fundingPolice,
         fundingHealth: this.fundingHealth,
         fundingEducation: this.fundingEducation,
+        weather: this.weather,
+        ordinances: this.ordinances,
         month: this.month,
         year: this.year,
         gameHour: this.gameHour,
@@ -506,6 +556,8 @@ export class SimulationEngine {
       if (data.fundingPolice !== undefined) this.fundingPolice = data.fundingPolice;
       if (data.fundingHealth !== undefined) this.fundingHealth = data.fundingHealth;
       if (data.fundingEducation !== undefined) this.fundingEducation = data.fundingEducation;
+      if (data.weather !== undefined) this.weather = data.weather;
+      if (data.ordinances !== undefined) this.ordinances = { ...this.ordinances, ...data.ordinances };
 
       for (let x = 0; x < this.grid.size; x++) {
         for (let y = 0; y < this.grid.size; y++) {
@@ -560,7 +612,8 @@ export class SimulationEngine {
         this.fundingFire,
         this.fundingPolice,
         this.fundingHealth,
-        this.fundingEducation
+        this.fundingEducation,
+        this.ordinances
       );
 
       if (this.onStatsUpdate) this.onStatsUpdate();

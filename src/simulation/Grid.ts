@@ -215,14 +215,18 @@ export class Grid {
     fundingFire: number = 100,
     fundingPolice: number = 100,
     fundingHealth: number = 100,
-    fundingEducation: number = 100
+    fundingEducation: number = 100,
+    ordinances?: { cleanEnergy?: boolean; neighborhoodWatch?: boolean; readingCampaign?: boolean }
   ) {
     const size = this.size;
 
     const fireRadius = Math.max(4, Math.round(14 * (fundingFire / 100)));
     const policeRadius = Math.max(4, Math.round(14 * (fundingPolice / 100)));
     const healthRadius = Math.max(5, Math.round(16 * (fundingHealth / 100)));
-    const educationRadius = Math.max(4, Math.round(14 * (fundingEducation / 100)));
+    let educationRadius = Math.max(4, Math.round(14 * (fundingEducation / 100)));
+    if (ordinances?.readingCampaign) {
+      educationRadius = Math.round(educationRadius * 1.25);
+    }
 
     // Reset temporary layers
     for (let x = 0; x < size; x++) {
@@ -281,7 +285,10 @@ export class Grid {
 
         // Pollution from Industrial Zones & Coal Power Plants (Radius 9)
         if (t.type === TileType.POWER_PLANT || (t.building && t.building.zone === ZoneType.INDUSTRIAL)) {
-          const intensity = t.type === TileType.POWER_PLANT ? 70 : 45;
+          let intensity = t.type === TileType.POWER_PLANT ? 70 : 45;
+          if (ordinances?.cleanEnergy && t.type === TileType.POWER_PLANT) {
+            intensity = Math.round(intensity * 0.6); // 40% reduction in power plant pollution
+          }
           this.applyRadialEffect(x, y, 9, (target, dist) => {
             target.pollution = Math.min(100, target.pollution + Math.round(intensity * (1 - dist / 9)));
             target.landValue = Math.max(5, target.landValue - Math.round(25 * (1 - dist / 9)));
@@ -295,7 +302,10 @@ export class Grid {
       for (let y = 0; y < size; y++) {
         const t = this.tiles[x][y];
         if (t.building) {
-          const rawCrime = Math.max(0, 60 - t.policeCoverage - Math.floor(t.landValue / 4));
+          let rawCrime = Math.max(0, 60 - t.policeCoverage - Math.floor(t.landValue / 4));
+          if (ordinances?.neighborhoodWatch && t.building.zone === ZoneType.RESIDENTIAL) {
+            rawCrime = Math.round(rawCrime * 0.65); // 35% reduction from neighborhood watch
+          }
           t.crime = Math.min(100, rawCrime);
         } else {
           t.crime = 0;
