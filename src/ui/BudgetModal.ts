@@ -53,6 +53,11 @@ export class BudgetModal {
   private eduCostVal!: HTMLElement;
   private eduRadiusVal!: HTMLElement;
 
+  private transitFundSlider!: HTMLInputElement;
+  private transitFundVal!: HTMLElement;
+  private transitCostVal!: HTMLElement;
+  private transitStopsVal!: HTMLElement;
+
   private utilCostVal!: HTMLElement;
   private ordCostVal!: HTMLElement;
   private totalExpVal!: HTMLElement;
@@ -212,6 +217,17 @@ export class BudgetModal {
                   </div>
                 </div>
 
+                <div class="budget-row">
+                  <div class="budget-row-info">
+                    <span class="budget-label">🚌 Public Bus Transit <small id="lbl-transit-stops">(0 Stops, 0 Depots)</small></span>
+                    <span class="budget-stat" id="fund-transit-cost">-$0/mo</span>
+                  </div>
+                  <div class="budget-slider-container">
+                    <input type="range" min="50" max="150" step="5" id="slider-fund-transit" class="budget-slider">
+                    <span class="budget-slider-val" id="val-fund-transit">100%</span>
+                  </div>
+                </div>
+
                 <div class="budget-row" style="opacity: 0.85;">
                   <div class="budget-row-info">
                     <span class="budget-label">⚡ Power, Water & Parks</span>
@@ -362,6 +378,11 @@ export class BudgetModal {
     this.eduCostVal = this.container.querySelector('#fund-edu-cost')!;
     this.eduRadiusVal = this.container.querySelector('#lbl-edu-radius')!;
 
+    this.transitFundSlider = this.container.querySelector('#slider-fund-transit')!;
+    this.transitFundVal = this.container.querySelector('#val-fund-transit')!;
+    this.transitCostVal = this.container.querySelector('#fund-transit-cost')!;
+    this.transitStopsVal = this.container.querySelector('#lbl-transit-stops')!;
+
     this.utilCostVal = this.container.querySelector('#fund-util-cost')!;
     this.ordCostVal = this.container.querySelector('#fund-ord-cost')!;
     this.totalExpVal = this.container.querySelector('#budget-total-exp')!;
@@ -429,12 +450,14 @@ export class BudgetModal {
       this.engine.fundingPolice = parseInt(this.policeFundSlider.value, 10);
       this.engine.fundingHealth = parseInt(this.healthFundSlider.value, 10);
       this.engine.fundingEducation = parseInt(this.eduFundSlider.value, 10);
+      this.engine.fundingTransit = parseInt(this.transitFundSlider.value, 10);
 
       this.engine.grid.recalculateServiceCoverages(
         this.engine.fundingFire,
         this.engine.fundingPolice,
         this.engine.fundingHealth,
         this.engine.fundingEducation,
+        this.engine.fundingTransit,
         this.engine.ordinances
       );
 
@@ -450,6 +473,7 @@ export class BudgetModal {
     this.policeFundSlider.addEventListener('input', onFundChange);
     this.healthFundSlider.addEventListener('input', onFundChange);
     this.eduFundSlider.addEventListener('input', onFundChange);
+    this.transitFundSlider.addEventListener('input', onFundChange);
 
     // Ordinance toggle click listeners
     const setupOrdToggle = (btn: HTMLButtonElement, key: keyof typeof this.engine.ordinances) => {
@@ -461,6 +485,7 @@ export class BudgetModal {
           this.engine.fundingPolice,
           this.engine.fundingHealth,
           this.engine.fundingEducation,
+          this.engine.fundingTransit,
           this.engine.ordinances
         );
         this.updateDisplay();
@@ -537,6 +562,7 @@ export class BudgetModal {
     this.engine.fundingPolice = 100;
     this.engine.fundingHealth = 100;
     this.engine.fundingEducation = 100;
+    this.engine.fundingTransit = 100;
 
     this.engine.ordinances.smokeDetectors = false;
     this.engine.ordinances.freeTransit = false;
@@ -552,8 +578,9 @@ export class BudgetModal {
     this.policeFundSlider.value = '100';
     this.healthFundSlider.value = '100';
     this.eduFundSlider.value = '100';
+    this.transitFundSlider.value = '100';
 
-    this.engine.grid.recalculateServiceCoverages(100, 100, 100, 100, this.engine.ordinances);
+    this.engine.grid.recalculateServiceCoverages(100, 100, 100, 100, 100, this.engine.ordinances);
     this.updateDisplay();
   }
 
@@ -568,6 +595,7 @@ export class BudgetModal {
     this.policeFundVal.textContent = `${this.policeFundSlider.value}%`;
     this.healthFundVal.textContent = `${this.healthFundSlider.value}%`;
     this.eduFundVal.textContent = `${this.eduFundSlider.value}%`;
+    this.transitFundVal.textContent = `${this.transitFundSlider.value}%`;
 
     // Dynamic radius indicators
     const fireR = Math.max(4, Math.round(14 * (parseInt(this.fireFundSlider.value, 10) / 100)));
@@ -582,6 +610,7 @@ export class BudgetModal {
     this.policeRadiusVal.textContent = `(Radius: ${polR})`;
     this.healthRadiusVal.textContent = `(Radius: ${hlthR})`;
     this.eduRadiusVal.textContent = `(Radius: ${eduR})`;
+    this.transitStopsVal.textContent = `(${this.engine.busStopCount} Stops, ${this.engine.busDepotCount} Depots)`;
 
     const ledger: FinancialLedger = this.engine.getFinancialLedger();
 
@@ -595,6 +624,7 @@ export class BudgetModal {
     this.policeCostVal.textContent = `-$${ledger.expensePolice.toLocaleString()}/mo`;
     this.healthCostVal.textContent = `-$${ledger.expenseHealth.toLocaleString()}/mo`;
     this.eduCostVal.textContent = `-$${ledger.expenseEducation.toLocaleString()}/mo`;
+    this.transitCostVal.textContent = `-$${ledger.expenseTransit.toLocaleString()}/mo`;
     this.utilCostVal.textContent = `-$${ledger.expenseUtilities.toLocaleString()}/mo`;
     this.ordCostVal.textContent = `-$${ledger.expenseOrdinances.toLocaleString()}/mo`;
     this.totalExpVal.textContent = `-$${ledger.totalExpenses.toLocaleString()}/mo`;

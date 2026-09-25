@@ -46,6 +46,7 @@ export class Grid {
           policeCoverage: 0,
           healthCoverage: 0,
           educationCoverage: 0,
+          transitCoverage: 0,
           variant: Math.floor(Math.random() * 4)
         };
       }
@@ -216,7 +217,8 @@ export class Grid {
     fundingPolice: number = 100,
     fundingHealth: number = 100,
     fundingEducation: number = 100,
-    ordinances?: { cleanEnergy?: boolean; neighborhoodWatch?: boolean; readingCampaign?: boolean }
+    fundingTransit: number = 100,
+    ordinances?: { cleanEnergy?: boolean; neighborhoodWatch?: boolean; readingCampaign?: boolean; freeTransit?: boolean }
   ) {
     const size = this.size;
 
@@ -227,6 +229,21 @@ export class Grid {
     if (ordinances?.readingCampaign) {
       educationRadius = Math.round(educationRadius * 1.25);
     }
+    let transitRadius = Math.max(3, Math.round(8 * (fundingTransit / 100)));
+    if (ordinances?.freeTransit) {
+      transitRadius = Math.round(transitRadius * 1.25);
+    }
+
+    // Count operational Bus Depots (must be powered, watered, and adjacent to a road)
+    let operationalDepots = 0;
+    for (let x = 0; x < size; x++) {
+      for (let y = 0; y < size; y++) {
+        const t = this.tiles[x][y];
+        if (t.type === TileType.BUS_DEPOT && t.powered && t.watered && this.isAdjacentToRoad(x, y)) {
+          operationalDepots++;
+        }
+      }
+    }
 
     // Reset temporary layers
     for (let x = 0; x < size; x++) {
@@ -236,6 +253,7 @@ export class Grid {
         t.policeCoverage = 0;
         t.healthCoverage = 0;
         t.educationCoverage = 0;
+        t.transitCoverage = 0;
         t.pollution = 0;
         t.landValue = 25; // baseline land value
       }
@@ -287,6 +305,22 @@ export class Grid {
         if (t.type === TileType.AVENUE) {
           this.applyRadialEffect(x, y, 3, (target, dist) => {
             target.landValue = Math.min(100, target.landValue + Math.round(15 * (1 - dist / 3)));
+          });
+        }
+
+        // Public Bus Stop Coverage (Active when at least 1 operational Bus Depot exists in the city)
+        if (t.type === TileType.BUS_STOP && operationalDepots > 0 && this.isAdjacentToRoad(x, y)) {
+          this.applyRadialEffect(x, y, transitRadius, (target, dist) => {
+            target.transitCoverage = Math.max(target.transitCoverage, Math.round(100 * (1 - dist / transitRadius)));
+            target.landValue = Math.min(100, target.landValue + Math.round(12 * (1 - dist / transitRadius)));
+          });
+        }
+
+        // Bus Depot localized transit presence
+        if (t.type === TileType.BUS_DEPOT && t.powered && t.watered && this.isAdjacentToRoad(x, y)) {
+          this.applyRadialEffect(x, y, 4, (target, dist) => {
+            target.transitCoverage = Math.max(target.transitCoverage, Math.round(60 * (1 - dist / 4)));
+            target.landValue = Math.min(100, target.landValue + Math.round(6 * (1 - dist / 4)));
           });
         }
 

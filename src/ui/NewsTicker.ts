@@ -154,6 +154,20 @@ export class NewsTicker {
     if (this.engine.fundingEducation >= 120) {
       list.push("🎓 HONOR ROLL: Local schools rank top in region following expanded education funding!");
     }
+    if (this.engine.fundingTransit < 80 && this.engine.busStopCount > 0) {
+      list.push("🚌 TRANSIT DELAYS: Low bus funding causes commuter delays and overcrowded shelters!");
+    } else if (this.engine.fundingTransit >= 120 && this.engine.busStopCount > 0) {
+      list.push("🚌 RAPID TRANSIT: Generous transit investment guarantees speedy bus service across town!");
+    }
+
+    // Transit Network Status
+    if (this.engine.busStopCount > 0 && this.engine.busDepotCount === 0) {
+      list.push("🚏 TRANSIT ALERT: Bus stops await service! Build a central Bus Depot to dispatch buses!");
+    } else if (this.engine.busRidership > 50) {
+      list.push(`🚌 RIDERSHIP BOOM: Over ${this.engine.busRidership} citizens ride municipal buses each month!`);
+    } else if (this.engine.busDepotCount > 0 && this.engine.busStopCount > 0) {
+      list.push("🚌 METRO TRANSIT: City buses roll out! Commuters enjoy convenient roadside pick-ups.");
+    }
 
     // 4. Municipal Ordinances & Policies
     if (this.engine.ordinances.smokeDetectors) {

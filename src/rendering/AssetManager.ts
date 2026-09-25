@@ -31,7 +31,10 @@ export class AssetManager {
       'hospital',
       'school',
       'fire_truck',
-      'police_car'
+      'police_car',
+      'bus_depot',
+      'bus_stop',
+      'city_bus'
     ];
 
     for (const key of assetKeys) {

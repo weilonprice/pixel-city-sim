@@ -113,6 +113,8 @@ window.addEventListener('DOMContentLoaded', () => {
       else if (tile.type === TileType.POWER_PLANT) desc = 'Coal Power Plant (Active Grid)';
       else if (tile.type === TileType.WATER_PUMP) desc = 'Water Pumping Station';
       else if (tile.type === TileType.PARK) desc = 'Public Park (+30 Land Value)';
+      else if (tile.type === TileType.BUS_DEPOT) desc = `Municipal Bus Depot (Fleet Dispatch HQ • Upkeep $15/mo • P:${tile.powered ? '⚡' : '❌'} W:${tile.watered ? '💧' : '❌'})`;
+      else if (tile.type === TileType.BUS_STOP) desc = `Roadside Bus Stop (Radius: 8 • Transit Cov: ${tile.transitCoverage}% • Upkeep $1/mo)`;
       else if (tile.building) {
         const b = tile.building;
         const fireStatus = b.onFire ? ' 🔥 ON FIRE!' : '';
@@ -250,6 +252,8 @@ window.addEventListener('DOMContentLoaded', () => {
         tile.isBridge = false;
         tile.building = undefined;
         grid.updateRoadAndNeighbors(x, y);
+        engine.updateUtilities();
+        grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation, engine.fundingTransit, engine.ordinances);
         return;
       }
 
@@ -266,6 +270,8 @@ window.addEventListener('DOMContentLoaded', () => {
         tile.zone = ZoneType.NONE;
         tile.building = undefined;
         grid.updateRoadAndNeighbors(x, y);
+        engine.updateUtilities();
+        grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation, engine.fundingTransit, engine.ordinances);
       }
       return;
     }
@@ -291,6 +297,7 @@ window.addEventListener('DOMContentLoaded', () => {
       tile.zone = ZoneType.NONE;
       tile.building = undefined;
       grid.updateRoadAndNeighbors(x, y);
+      engine.updateUtilities();
       return;
     }
 
@@ -315,6 +322,7 @@ window.addEventListener('DOMContentLoaded', () => {
       tile.zone = ZoneType.NONE;
       tile.building = undefined;
       grid.updateRoadAndNeighbors(x, y);
+      engine.updateUtilities();
       return;
     }
 
@@ -339,7 +347,8 @@ window.addEventListener('DOMContentLoaded', () => {
       tile.zone = ZoneType.NONE;
       tile.building = undefined;
       grid.updateRoadAndNeighbors(x, y);
-      grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation, engine.ordinances);
+      engine.updateUtilities();
+      grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation, engine.fundingTransit, engine.ordinances);
       return;
     }
 
@@ -398,6 +407,8 @@ window.addEventListener('DOMContentLoaded', () => {
       tile.type = TileType.POWER_PLANT;
       tile.zone = ZoneType.NONE;
       tile.building = undefined;
+      engine.updateUtilities();
+      grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation, engine.fundingTransit, engine.ordinances);
       return;
     }
 
@@ -414,6 +425,8 @@ window.addEventListener('DOMContentLoaded', () => {
       tile.type = TileType.WATER_PUMP;
       tile.zone = ZoneType.NONE;
       tile.building = undefined;
+      engine.updateUtilities();
+      grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation, engine.fundingTransit, engine.ordinances);
       return;
     }
 
@@ -430,7 +443,7 @@ window.addEventListener('DOMContentLoaded', () => {
       tile.type = TileType.FIRE_STATION;
       tile.zone = ZoneType.NONE;
       tile.building = undefined;
-      grid.recalculateServiceCoverages();
+      grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation, engine.fundingTransit, engine.ordinances);
       return;
     }
 
@@ -447,7 +460,7 @@ window.addEventListener('DOMContentLoaded', () => {
       tile.type = TileType.POLICE_STATION;
       tile.zone = ZoneType.NONE;
       tile.building = undefined;
-      grid.recalculateServiceCoverages();
+      grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation, engine.fundingTransit, engine.ordinances);
       return;
     }
 
@@ -464,7 +477,7 @@ window.addEventListener('DOMContentLoaded', () => {
       tile.type = TileType.HOSPITAL;
       tile.zone = ZoneType.NONE;
       tile.building = undefined;
-      grid.recalculateServiceCoverages();
+      grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation, engine.fundingTransit, engine.ordinances);
       return;
     }
 
@@ -481,7 +494,7 @@ window.addEventListener('DOMContentLoaded', () => {
       tile.type = TileType.SCHOOL;
       tile.zone = ZoneType.NONE;
       tile.building = undefined;
-      grid.recalculateServiceCoverages();
+      grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation, engine.fundingTransit, engine.ordinances);
       return;
     }
 
@@ -498,7 +511,42 @@ window.addEventListener('DOMContentLoaded', () => {
       tile.type = TileType.PARK;
       tile.zone = ZoneType.NONE;
       tile.building = undefined;
-      grid.recalculateServiceCoverages();
+      grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation, engine.fundingTransit, engine.ordinances);
+      return;
+    }
+
+    // Municipal Bus Depot
+    if (tool === 'bus-depot') {
+      if (tile.type !== TileType.GRASS) return;
+      if (engine.funds < COSTS.BUS_DEPOT) {
+        sounds.playError();
+        hud.showToast("Not enough funds for Bus Depot ($400)!");
+        return;
+      }
+      engine.funds -= COSTS.BUS_DEPOT;
+      sounds.playBuild();
+      tile.type = TileType.BUS_DEPOT;
+      tile.zone = ZoneType.NONE;
+      tile.building = undefined;
+      engine.updateUtilities();
+      grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation, engine.fundingTransit, engine.ordinances);
+      return;
+    }
+
+    // Roadside Bus Stop
+    if (tool === 'bus-stop') {
+      if (tile.type !== TileType.GRASS && tile.type !== TileType.DIRT) return;
+      if (engine.funds < COSTS.BUS_STOP) {
+        sounds.playError();
+        hud.showToast("Not enough funds for Bus Stop ($50)!");
+        return;
+      }
+      engine.funds -= COSTS.BUS_STOP;
+      sounds.playBuild();
+      tile.type = TileType.BUS_STOP;
+      tile.zone = ZoneType.NONE;
+      tile.building = undefined;
+      grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation, engine.fundingTransit, engine.ordinances);
       return;
     }
   }
@@ -539,7 +587,7 @@ window.addEventListener('DOMContentLoaded', () => {
   requestAnimationFrame(loop);
 
   // Expose for testing and debugging
-  (window as unknown as { game: unknown }).game = { engine, grid, camera, hud, applyTool, snapshotTool, sounds };
+  (window as unknown as { game: unknown }).game = { engine, grid, camera, hud, applyTool, snapshotTool, sounds, renderer };
 
   hud.showToast("Connect your roads to the Interstate 10 interchange to bring citizens in!");
 });
