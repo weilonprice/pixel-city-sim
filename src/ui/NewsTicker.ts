@@ -79,7 +79,7 @@ export class NewsTicker {
     this.updateHeadline();
   }
 
-  private generateHeadlines(): string[] {
+  public generateHeadlines(): string[] {
     const list: string[] = [];
 
     // 1. Emergency & Utility Headlines
@@ -221,6 +221,23 @@ export class NewsTicker {
     if (this.engine.trainStationCount > 0) {
       list.push(`🚂 ALL ABOARD: Passenger railway network carries ${this.engine.trainRidership} daily riders along steel corridors!`);
       list.push("🚉 RAILWAY BOOM: Commuters celebrate rapid transit as passenger trains connect city districts.");
+    }
+
+    // High-Density Skylines & Skyscrapers
+    let maxBuildingLevel = 0;
+    const grid = this.engine.grid;
+    for (let x = 0; x < grid.size; x++) {
+      for (let y = 0; y < grid.size; y++) {
+        const b = grid.tiles[x][y].building;
+        if (b && b.level > maxBuildingLevel) maxBuildingLevel = b.level;
+      }
+    }
+    if (maxBuildingLevel >= 4) {
+      list.push("🏙️ HIGH-RISE BOOM: Luxury condominiums and corporate plazas transform the urban skyline!");
+    }
+    if (maxBuildingLevel >= 5) {
+      list.push("💎 ARCHITECTURAL MARVEL: The 50-story Tier 5 glass megatower pierces the clouds downtown!");
+      list.push("🚀 TECH REVOLUTION: Clean aerospace & robotics mega-campuses establish city as global innovation hub.");
     }
 
     // 7. Classic Humorous Headlines

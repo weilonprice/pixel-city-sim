@@ -1769,13 +1769,15 @@ export class PixelRenderer {
     const level = b.level;
     const style = b.style;
 
-    const spriteKey = b.zone === ZoneType.RESIDENTIAL
-      ? (level === 1 ? 'house_cottage' : (level === 2 ? 'townhouse' : 'apartment_tower'))
-      : (b.zone === ZoneType.COMMERCIAL
-        ? (level === 1 ? 'corner_diner' : (level === 2 ? 'office_building' : 'skyscraper'))
-        : (level === 1 ? 'warehouse' : 'factory'));
+    const spriteKey = level <= 3 ? (
+      b.zone === ZoneType.RESIDENTIAL
+        ? (level === 1 ? 'house_cottage' : (level === 2 ? 'townhouse' : 'apartment_tower'))
+        : (b.zone === ZoneType.COMMERCIAL
+          ? (level === 1 ? 'corner_diner' : (level === 2 ? 'office_building' : 'skyscraper'))
+          : (level === 1 ? 'warehouse' : 'factory'))
+    ) : null;
 
-    if (assetManager.hasSprite(spriteKey)) {
+    if (spriteKey && assetManager.hasSprite(spriteKey)) {
       const img = assetManager.getSprite(spriteKey)!;
       const w = img.naturalWidth * z;
       const h = img.naturalHeight * z;
@@ -1930,7 +1932,8 @@ export class PixelRenderer {
         ctx.fillRect(sx - 10 * z, fy, 4 * z, 6 * z);
         ctx.fillRect(sx + 4 * z, fy + 2 * z, 4 * z, 6 * z);
       }
-    } else {
+    } else if (level === 3) {
+      // Tier 3: Apartment Block
       const height = 64 * z;
       this.drawIsometricBox(sx, sy, hw * 0.75, hh * 0.75, height, '#e2e8f0', '#cbd5e1', '#94a3b8');
       ctx.fillStyle = '#0284c7';
@@ -1941,6 +1944,104 @@ export class PixelRenderer {
       }
       ctx.fillStyle = '#78350f';
       ctx.fillRect(sx - 4 * z, sy - height - 10 * z, 8 * z, 10 * z);
+    } else if (level === 4) {
+      // Tier 4: Luxury High-Rise Condominiums (The Horizon Residences)
+      const podiumH = 20 * z;
+      this.drawIsometricBox(sx, sy, hw * 0.8, hh * 0.8, podiumH, '#475569', '#334155', '#1e293b');
+
+      const towerH = 95 * z;
+      this.drawIsometricBox(sx, sy - podiumH * 0.25, hw * 0.64, hh * 0.64, towerH, '#f8fafc', '#e2e8f0', '#cbd5e1');
+
+      // Balconies with glowing glass balustrades
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.75)';
+      for (let f = 0; f < 6; f++) {
+        const fy = sy - 14 * z - f * 13 * z;
+        ctx.fillRect(sx - 13 * z, fy, 7 * z, 4 * z);
+        ctx.fillRect(sx + 4 * z, fy + 3 * z, 7 * z, 4 * z);
+      }
+
+      // Warm interior evening lights
+      ctx.fillStyle = '#fef08a';
+      for (let f = 0; f < 6; f++) {
+        const fy = sy - 13 * z - f * 13 * z;
+        ctx.fillRect(sx - 11 * z, fy + 1 * z, 3 * z, 2 * z);
+        ctx.fillRect(sx + 6 * z, fy + 4 * z, 3 * z, 2 * z);
+      }
+
+      // Rooftop Luxury Penthouse Suite
+      const pentH = 15 * z;
+      const topY = sy - podiumH * 0.25 - towerH;
+      this.drawIsometricBox(sx, topY, hw * 0.42, hh * 0.42, pentH, '#1e293b', '#0f172a', '#020617');
+
+      // Penthouse floor-to-ceiling glowing panoramic windows
+      ctx.fillStyle = '#facc15';
+      ctx.fillRect(sx - 5 * z, topY - pentH + 3 * z, 10 * z, 4 * z);
+
+      // Rooftop infinity pool (glowing cyan water)
+      const shimmer = Math.sin(this.animFrame * 0.15) * 1.5;
+      ctx.fillStyle = '#06b6d4';
+      ctx.beginPath();
+      ctx.ellipse(sx - 6 * z, topY - 2 * z, 4 * z + shimmer, 2.2 * z, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Rooftop garden greenery
+      ctx.fillStyle = '#16a34a';
+      ctx.beginPath();
+      ctx.arc(sx + 6 * z, topY - 3 * z, 3 * z, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // Tier 5: Modern Glass Residential Megatower (Apex Pinnacle Spire)
+      const baseH = 28 * z;
+      this.drawIsometricBox(sx, sy, hw * 0.82, hh * 0.82, baseH, '#0c4a6e', '#075985', '#0369a1');
+
+      const midH = 75 * z;
+      this.drawIsometricBox(sx, sy - baseH * 0.3, hw * 0.68, hh * 0.68, midH, '#0284c7', '#0369a1', '#075985');
+
+      const topH = 126 * z;
+      this.drawIsometricBox(sx, sy - baseH * 0.3 - midH * 0.3, hw * 0.52, hh * 0.52, topH, '#38bdf8', '#0284c7', '#0369a1');
+
+      // Mirrored glass curtain wall specular reflection grid
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.lineWidth = Math.max(1, 1 * z);
+      for (let floor = 0; floor < 8; floor++) {
+        const fy = sy - 18 * z - floor * 14 * z;
+        ctx.beginPath();
+        ctx.moveTo(sx - 14 * z, fy);
+        ctx.lineTo(sx - 2 * z, fy + 6 * z);
+        ctx.moveTo(sx + 2 * z, fy + 6 * z);
+        ctx.lineTo(sx + 14 * z, fy);
+        ctx.stroke();
+      }
+
+      // Mid-tower Double-Height Sky-Lounge (Illuminated golden observation floor)
+      const skyLoungeY = sy - 65 * z;
+      ctx.fillStyle = '#fef08a';
+      ctx.fillRect(sx - 10 * z, skyLoungeY, 20 * z, 5 * z);
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(sx - 6 * z, skyLoungeY, 1.5 * z, 5 * z);
+      ctx.fillRect(sx + 4 * z, skyLoungeY, 1.5 * z, 5 * z);
+
+      // Soaring Architectural Crown & Needle Spire
+      const peakY = sy - baseH * 0.3 - midH * 0.3 - topH;
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = Math.max(1.5, 2.5 * z);
+      ctx.beginPath();
+      ctx.moveTo(sx, peakY);
+      ctx.lineTo(sx, peakY - 26 * z);
+      ctx.stroke();
+
+      // Red Aviation Obstruction Strobe at the tip
+      const beaconFlash = (this.animFrame % 30 < 15);
+      if (beaconFlash) {
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(sx, peakY - 26 * z, 3.5 * z, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(sx, peakY - 26 * z, 1.5 * z, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
   }
 
@@ -1965,7 +2066,7 @@ export class PixelRenderer {
         ctx.fillRect(sx - 12 * z, fy, 8 * z, 5 * z);
         ctx.fillRect(sx + 4 * z, fy + 3 * z, 8 * z, 5 * z);
       }
-    } else {
+    } else if (level === 3) {
       const height = 75 * z;
       this.drawIsometricBox(sx, sy, hw * 0.8, hh * 0.8, height, '#06b6d4', '#0891b2', '#0e7490');
 
@@ -1980,6 +2081,142 @@ export class PixelRenderer {
         ctx.fillStyle = '#ff0000';
         ctx.beginPath();
         ctx.arc(sx, sy - height - 16 * z, 2.5 * z, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else if (level === 4) {
+      // Tier 4: Corporate Financial Plaza
+      // Modern corporate glass tower with stepped setbacks, sapphire/emerald glass curtain wall,
+      // glowing stock ticker / corporate crest, and rooftop solar / helipad
+      const podiumH = 26 * z;
+      this.drawIsometricBox(sx, sy, hw * 0.85, hh * 0.85, podiumH, '#1e293b', '#0f172a', '#020617');
+
+      const towerH = 105 * z;
+      this.drawIsometricBox(sx, sy - podiumH * 0.28, hw * 0.68, hh * 0.68, towerH, '#0ea5e9', '#0284c7', '#0369a1');
+
+      // Horizontal floor-to-ceiling glass curtain bands
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.lineWidth = Math.max(1, 1.2 * z);
+      for (let floor = 0; floor < 7; floor++) {
+        const fy = sy - 16 * z - floor * 14 * z;
+        ctx.beginPath();
+        ctx.moveTo(sx - 13 * z, fy);
+        ctx.lineTo(sx, fy + 5 * z);
+        ctx.lineTo(sx + 13 * z, fy);
+        ctx.stroke();
+      }
+
+      // Ground level illuminated grand atrium
+      ctx.fillStyle = '#fef08a';
+      ctx.fillRect(sx - 8 * z, sy - 8 * z, 16 * z, 6 * z);
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(sx - 1 * z, sy - 8 * z, 2 * z, 6 * z);
+
+      // Corporate LED ticker / logo crest
+      const tickerY = sy - 82 * z;
+      ctx.fillStyle = '#10b981'; // Emerald financial green
+      ctx.fillRect(sx - 10 * z, tickerY, 20 * z, 3.5 * z);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(sx - 7 * z, tickerY + 1 * z, 2 * z, 1.5 * z);
+      ctx.fillRect(sx - 2 * z, tickerY + 1 * z, 4 * z, 1.5 * z);
+      ctx.fillRect(sx + 5 * z, tickerY + 1 * z, 2 * z, 1.5 * z);
+
+      // Rooftop Helipad
+      const roofY = sy - podiumH * 0.28 - towerH;
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 1.5 * z;
+      ctx.beginPath();
+      ctx.ellipse(sx, roofY - 2 * z, 7 * z, 3.5 * z, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = '#facc15';
+      ctx.font = `bold ${Math.max(7, Math.floor(6 * z))}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('H', sx, roofY - 2 * z);
+    } else {
+      // Tier 5: World Trade Megatower / Apex Financial Center
+      // Monumental skyscraper with iconic structural diagonal cross-bracing (Hancock-style),
+      // panoramic golden observation deck / sky lounge, dual telecommunication masts with blinking aviation strobes
+      const baseH = 32 * z;
+      this.drawIsometricBox(sx, sy, hw * 0.86, hh * 0.86, baseH, '#0f172a', '#020617', '#000000');
+
+      const midH = 80 * z;
+      this.drawIsometricBox(sx, sy - baseH * 0.3, hw * 0.72, hh * 0.72, midH, '#0369a1', '#075985', '#0c4a6e');
+
+      const topH = 145 * z;
+      this.drawIsometricBox(sx, sy - baseH * 0.3 - midH * 0.3, hw * 0.54, hh * 0.54, topH, '#38bdf8', '#0284c7', '#0369a1');
+
+      // Iconic Hancock-style structural diagonal cross-braces (X-bracing)
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+      ctx.lineWidth = Math.max(1.2, 1.8 * z);
+      for (let xTier = 0; xTier < 3; xTier++) {
+        const topTierY = sy - 40 * z - xTier * 34 * z;
+        const btmTierY = topTierY + 32 * z;
+
+        // Left face X-brace
+        ctx.beginPath();
+        ctx.moveTo(sx - 13 * z, topTierY);
+        ctx.lineTo(sx - 1 * z, btmTierY + 5 * z);
+        ctx.moveTo(sx - 13 * z, btmTierY);
+        ctx.lineTo(sx - 1 * z, topTierY + 5 * z);
+        // Right face X-brace
+        ctx.moveTo(sx + 1 * z, topTierY + 5 * z);
+        ctx.lineTo(sx + 13 * z, btmTierY);
+        ctx.moveTo(sx + 1 * z, btmTierY + 5 * z);
+        ctx.lineTo(sx + 13 * z, topTierY);
+        ctx.stroke();
+      }
+
+      // Panoramic High-Floor Observation Lounge (Illuminated 360 gold ring)
+      const obsY = sy - 110 * z;
+      ctx.fillStyle = '#fde047';
+      ctx.fillRect(sx - 11 * z, obsY, 22 * z, 6 * z);
+      // Window mullions
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(sx - 7 * z, obsY, 1.5 * z, 6 * z);
+      ctx.fillRect(sx - 2 * z, obsY, 1.5 * z, 6 * z);
+      ctx.fillRect(sx + 3 * z, obsY, 1.5 * z, 6 * z);
+      ctx.fillRect(sx + 7 * z, obsY, 1.5 * z, 6 * z);
+
+      // Roof Crown & Dual Telecommunications Broadcast Masts
+      const peakY = sy - baseH * 0.3 - midH * 0.3 - topH;
+      ctx.strokeStyle = '#f1f5f9';
+      ctx.lineWidth = Math.max(1.5, 2 * z);
+
+      // Left antenna
+      ctx.beginPath();
+      ctx.moveTo(sx - 4 * z, peakY);
+      ctx.lineTo(sx - 4 * z, peakY - 24 * z);
+      ctx.stroke();
+
+      // Right antenna
+      ctx.beginPath();
+      ctx.moveTo(sx + 4 * z, peakY);
+      ctx.lineTo(sx + 4 * z, peakY - 24 * z);
+      ctx.stroke();
+
+      // Alternating / synchronized red warning strobes
+      const flashA = (this.animFrame % 30 < 15);
+      const flashB = ((this.animFrame + 15) % 30 < 15);
+
+      if (flashA) {
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(sx - 4 * z, peakY - 24 * z, 3 * z, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(sx - 4 * z, peakY - 24 * z, 1.2 * z, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      if (flashB) {
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(sx + 4 * z, peakY - 24 * z, 3 * z, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(sx + 4 * z, peakY - 24 * z, 1.2 * z, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -2014,7 +2251,7 @@ export class PixelRenderer {
           size: 4 * z
         });
       }
-    } else {
+    } else if (level === 3) {
       const height = 45 * z;
       this.drawIsometricBox(sx, sy, hw * 0.8, hh * 0.8, height, '#374151', '#1f2937', '#111827');
 
@@ -2032,6 +2269,102 @@ export class PixelRenderer {
           maxLife: 50,
           color: 'rgba(209, 213, 219, 0.6)',
           size: 5 * z
+        });
+      }
+    } else if (level === 4) {
+      // Tier 4: Clean Biotech & Advanced Research Campus
+      // Sleek pristine white/slate modular labs, glowing cyan bioreactors, high-efficiency solar grid, pure clean steam
+      const mainH = 38 * z;
+      this.drawIsometricBox(sx, sy, hw * 0.82, hh * 0.82, mainH, '#f8fafc', '#cbd5e1', '#64748b');
+
+      // Central Glass Research Atrium
+      const atriumH = 52 * z;
+      this.drawIsometricBox(sx, sy - 8 * z, hw * 0.46, hh * 0.46, atriumH, '#38bdf8', '#0284c7', '#0369a1');
+
+      // Glowing Cylindrical Bioreactors / Chemical Synthesizers
+      const bioX = sx - 10 * z;
+      const bioY = sy - mainH - 6 * z;
+      ctx.fillStyle = '#06b6d4';
+      ctx.fillRect(bioX - 3.5 * z, bioY, 7 * z, 12 * z);
+      ctx.fillStyle = '#a5f3fc';
+      ctx.fillRect(bioX - 1.5 * z, bioY + 2 * z, 3 * z, 8 * z);
+
+      // Rooftop Photovoltaic Solar Array
+      ctx.fillStyle = '#1e3a8a';
+      ctx.fillRect(sx + 2 * z, sy - mainH - 4 * z, 11 * z, 6 * z);
+      ctx.strokeStyle = '#60a5fa';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(sx + 2 * z, sy - mainH - 4 * z, 11 * z, 6 * z);
+
+      // Clean Pure White Steam Particles (low pollution)
+      if (this.animFrame % 14 === 0) {
+        this.particles.push({
+          x: bioX,
+          y: bioY,
+          vx: (Math.random() - 0.5) * 0.25,
+          vy: -0.6 - Math.random() * 0.3,
+          life: 0,
+          maxLife: 35,
+          color: 'rgba(240, 249, 255, 0.75)',
+          size: 3.5 * z
+        });
+      }
+    } else {
+      // Tier 5: Aerospace & Robotics Megafactory / Orbital Tech Campus
+      // State-of-the-art dark carbon composite hangar, geodesic glass dome, amber/cyan laser status strips, assembly gantry
+      const hangarH = 46 * z;
+      this.drawIsometricBox(sx, sy, hw * 0.85, hh * 0.85, hangarH, '#1e293b', '#0f172a', '#020617');
+
+      // Geodesic Glass Assembly Dome
+      const domeY = sy - hangarH - 2 * z;
+      ctx.fillStyle = '#0284c7';
+      ctx.beginPath();
+      ctx.ellipse(sx, domeY, 11 * z, 7 * z, 0, Math.PI, 0);
+      ctx.fill();
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = Math.max(1, 1.5 * z);
+      ctx.stroke();
+
+      // Glowing Neon Cyan Core / Amber Hazard Accents
+      const neonGlow = Math.sin(this.animFrame * 0.1) * 0.3 + 0.7;
+      ctx.fillStyle = `rgba(56, 189, 248, ${neonGlow})`;
+      ctx.fillRect(sx - 12 * z, sy - 18 * z, 24 * z, 2 * z);
+      ctx.fillRect(sx - 12 * z, sy - 12 * z, 24 * z, 2 * z);
+
+      // Yellow/Black Industrial Hazard Warning stripe on base
+      ctx.fillStyle = '#eab308';
+      ctx.fillRect(sx - 14 * z, sy - 4 * z, 28 * z, 3 * z);
+      ctx.fillStyle = '#000000';
+      for (let s = 0; s < 5; s++) {
+        ctx.fillRect(sx - 12 * z + s * 5 * z, sy - 4 * z, 2 * z, 3 * z);
+      }
+
+      // Overhead Gantry Assembly Crane & Satellite Communications Dish
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = Math.max(1.2, 1.8 * z);
+      ctx.beginPath();
+      ctx.moveTo(sx + 8 * z, domeY);
+      ctx.lineTo(sx + 8 * z, domeY - 14 * z);
+      ctx.lineTo(sx + 15 * z, domeY - 14 * z);
+      ctx.stroke();
+
+      // Satellite Dish
+      ctx.fillStyle = '#e2e8f0';
+      ctx.beginPath();
+      ctx.arc(sx - 9 * z, domeY - 5 * z, 4 * z, -0.6 * Math.PI, 0.4 * Math.PI);
+      ctx.fill();
+
+      // Clean Ion / Plasma Thrust Particles (very subtle tech glow)
+      if (this.animFrame % 18 === 0) {
+        this.particles.push({
+          x: sx,
+          y: domeY - 2 * z,
+          vx: (Math.random() - 0.5) * 0.2,
+          vy: -0.5 - Math.random() * 0.2,
+          life: 0,
+          maxLife: 25,
+          color: 'rgba(56, 189, 248, 0.65)',
+          size: 2.5 * z
         });
       }
     }

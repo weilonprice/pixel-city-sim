@@ -387,6 +387,36 @@ class SoundManager {
     whiteNoise.start(t);
   }
 
+  // Modern Skyscraper Completion Chime (Crystalline synth arpeggio)
+  public playSkyscraperFanfare() {
+    if (this.isMuted) return;
+    this.initCtx();
+    if (!this.ctx || !this.masterGain) return;
+
+    const t = this.ctx.currentTime;
+    const notes = [
+      { f: 659.25, delay: 0.00, dur: 0.15 }, // E5
+      { f: 830.61, delay: 0.08, dur: 0.15 }, // G#5
+      { f: 987.77, delay: 0.16, dur: 0.20 }, // B5
+      { f: 1318.51, delay: 0.24, dur: 0.60 } // E6
+    ];
+
+    notes.forEach(n => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(n.f, t + n.delay);
+
+      gain.gain.setValueAtTime(0.06, t + n.delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + n.delay + n.dur);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+      osc.start(t + n.delay);
+      osc.stop(t + n.delay + n.dur);
+    });
+  }
+
   // Locomotive Train Horn (Classic twin-tone brass chime)
   public playTrainHorn() {
     if (this.isMuted) return;

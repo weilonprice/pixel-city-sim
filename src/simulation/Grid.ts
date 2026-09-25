@@ -385,6 +385,10 @@ export class Grid {
         // Pollution from Industrial Zones & Coal Power Plants (Radius 9)
         if (t.type === TileType.POWER_PLANT || (t.building && t.building.zone === ZoneType.INDUSTRIAL)) {
           let intensity = t.type === TileType.POWER_PLANT ? 70 : 45;
+          if (t.building && t.building.zone === ZoneType.INDUSTRIAL) {
+            if (t.building.level === 4) intensity = 18; // Clean High-Tech Research & Biotech Campus
+            else if (t.building.level === 5) intensity = 8; // Advanced Aerospace & Robotics Megafactory (near-zero emission)
+          }
           if (ordinances?.cleanEnergy && t.type === TileType.POWER_PLANT) {
             intensity = Math.round(intensity * 0.6); // 40% reduction in power plant pollution
           }
