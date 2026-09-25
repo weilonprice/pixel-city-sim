@@ -11,6 +11,18 @@ A prioritized development roadmap and feature checklist for expanding **Pixel Ci
   - [x] **Police Department**: Police precincts; crime generation based on land value and police presence; patrolling police cruisers with flashing sirens.
   - [x] **Healthcare**: Hospital & emergency clinics with 16-tile health coverage boosting land value and growth.
   - [x] **Education**: Schools with 14-tile education coverage unlocking high-density skyscrapers.
+- [x] **PixelLab Municipal & Emergency Sprites (Batch 2)**
+  - [x] Generated & integrated `fire_station.png`, `police_station.png`, `hospital.png`, `school.png`.
+  - [x] Generated & integrated `fire_truck.png` and `police_car.png` with dynamic emergency sirens.
+- [x] **Drag-to-Build & Rectangle Zoning UX**
+  - [x] Drag-to-zone bounding box for residential, commercial, industrial, and mass demolish.
+  - [x] Straight-line dominant-axis road dragging.
+  - [x] Live isometric highlight polygon and dimension/cost badge HUD.
+- [x] **Floating Status Alert Badges**
+  - [x] Bobbing animated badges for 🚫 (no road access to I-10), ⚡ (no power), 💧 (no water), and 🔥 (fire).
+- [x] **Radar Mini-Map Navigation**
+  - [x] 128x128 pixel radar widget in bottom-right corner displaying 64x64 terrain, roads, water, and zones.
+  - [x] Interactive camera viewport frustum box with click/drag panning and collapse toggle.
 - [x] **Waterfront Bridges & Overpasses**
   - [x] Dedicated bridge detection when laying roads across river tiles.
   - [x] Elevated bridge rendering with concrete river pylons and red safety trusses.
