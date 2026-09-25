@@ -25,7 +25,13 @@ export class AssetManager {
       'water_pump',
       'city_park',
       'semi_truck',
-      'taxi'
+      'taxi',
+      'fire_station',
+      'police_station',
+      'hospital',
+      'school',
+      'fire_truck',
+      'police_car'
     ];
 
     for (const key of assetKeys) {

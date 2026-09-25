@@ -239,6 +239,66 @@
       overflow-x: auto;
     }
 
+    /* Radar Mini-Map Widget */
+    #minimap-container {
+      position: absolute;
+      bottom: 74px;
+      right: 14px;
+      background: #181824;
+      border: 2px solid #36364d;
+      border-radius: 6px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+      z-index: 20;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+    }
+
+    #minimap-header {
+      height: 20px;
+      background: #242436;
+      border-bottom: 1px solid #36364d;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 8px;
+    }
+
+    .minimap-title {
+      font-size: 8px;
+      font-weight: bold;
+      color: #ffd700;
+      letter-spacing: 1px;
+    }
+
+    #minimap-toggle {
+      background: none;
+      border: none;
+      color: #9ca3af;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 10px;
+      line-height: 1;
+      padding: 0 2px;
+    }
+
+    #minimap-toggle:hover {
+      color: #ffffff;
+    }
+
+    #minimap-canvas {
+      width: 128px;
+      height: 128px;
+      display: block;
+      cursor: crosshair;
+      image-rendering: pixelated;
+    }
+
+    #minimap-container.collapsed #minimap-canvas {
+      display: none;
+    }
+
     .tool-btn {
       display: flex;
       flex-direction: column;
@@ -384,6 +444,15 @@
     </div>
 
     <div id="toast">Connect your roads to the Interstate 10 interchange to bring citizens in!</div>
+
+    <!-- RADAR MINI-MAP -->
+    <div id="minimap-container">
+      <div id="minimap-header">
+        <span class="minimap-title">RADAR</span>
+        <button id="minimap-toggle" title="Toggle Mini-map">−</button>
+      </div>
+      <canvas id="minimap-canvas" width="128" height="128"></canvas>
+    </div>
   </main>
 
   <!-- BOTTOM TOOLBAR -->

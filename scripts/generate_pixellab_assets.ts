@@ -118,7 +118,36 @@ const ASSET_QUEUE: AssetRequest[] = [
     height: 64,
     direction: 'south-east'
   },
-  // 5. Vehicles
+  // 5. Municipal Services (Batch 2)
+  {
+    id: 'fire_station',
+    description: 'Isometric 2-story classic red brick fire station, two red arched garage doors, hose drying tower, emergency siren, clean 16-bit pixel art',
+    width: 64,
+    height: 64,
+    direction: 'south-east'
+  },
+  {
+    id: 'police_station',
+    description: 'Isometric 2-story municipal police precinct headquarters, blue trim, rooftop radio communication dish, front steps, clean 16-bit pixel art',
+    width: 64,
+    height: 64,
+    direction: 'south-east'
+  },
+  {
+    id: 'hospital',
+    description: 'Isometric modern municipal hospital and emergency clinic, red cross medical emblem, ambulance bay entrance, clean 16-bit pixel art',
+    width: 64,
+    height: 64,
+    direction: 'south-east'
+  },
+  {
+    id: 'school',
+    description: 'Isometric 2-story red brick elementary academy school, central clock tower, white columns, clean 16-bit pixel art',
+    width: 64,
+    height: 64,
+    direction: 'south-east'
+  },
+  // 6. Vehicles
   {
     id: 'taxi',
     description: 'Isometric yellow city taxi cab sedan car, clean 16-bit pixel art',
@@ -132,10 +161,31 @@ const ASSET_QUEUE: AssetRequest[] = [
     width: 64,
     height: 48,
     direction: 'south-east'
+  },
+  {
+    id: 'fire_truck',
+    description: 'Isometric red city fire engine truck with ladders and emergency flashers, clean 16-bit pixel art',
+    width: 48,
+    height: 48,
+    direction: 'south-east'
+  },
+  {
+    id: 'police_car',
+    description: 'Isometric black and white municipal police patrol cruiser car with emergency rooftop lightbar, clean 16-bit pixel art',
+    width: 48,
+    height: 48,
+    direction: 'south-east'
   }
 ];
 
 async function generateAsset(token: string, asset: AssetRequest, outputDir: string) {
+  const outPath = path.join(outputDir, `${asset.id}.png`);
+  const force = process.argv.includes('--force');
+  if (fs.existsSync(outPath) && !force) {
+    console.log(`   ⏩ [${asset.id}] Already exists at public/assets/sprites/${asset.id}.png, skipping.`);
+    return;
+  }
+
   console.log(`\n🎨 [${asset.id}] Submitting generation job to PixelLab...`);
   console.log(`   Prompt: "${asset.description.substring(0, 65)}..."`);
 
@@ -175,8 +225,6 @@ async function generateAsset(token: string, asset: AssetRequest, outputDir: stri
   // Strip possible data:image/png;base64, prefix
   const base64Data = data.image.base64.replace(/^data:image\/\w+;base64,/, '');
   const buffer = Buffer.from(base64Data, 'base64');
-
-  const outPath = path.join(outputDir, `${asset.id}.png`);
   fs.writeFileSync(outPath, buffer);
   console.log(`   ✨ Saved sprite: public/assets/sprites/${asset.id}.png (${buffer.length} bytes)`);
 }

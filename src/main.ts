@@ -3,6 +3,7 @@ import { Grid } from './simulation/Grid.ts';
 import { PixelRenderer } from './rendering/PixelRenderer.ts';
 import { SimulationEngine } from './simulation/SimulationEngine.ts';
 import { HUD } from './ui/HUD.ts';
+import { MiniMap } from './ui/MiniMap.ts';
 import { TileType, ZoneType, COSTS } from './core/Constants.ts';
 import { sounds } from './core/SoundEffects.ts';
 
@@ -20,10 +21,27 @@ window.addEventListener('DOMContentLoaded', () => {
   const renderer = new PixelRenderer(ctx, camera, grid, engine);
   const hud = new HUD(engine);
 
+  // Initialize Radar Mini-Map
+  const minimapCanvas = document.getElementById('minimap-canvas') as HTMLCanvasElement;
+  const minimapContainer = document.getElementById('minimap-container')!;
+  const minimapToggle = document.getElementById('minimap-toggle') as HTMLButtonElement;
+  const minimap = new MiniMap(minimapCanvas, minimapContainer, minimapToggle, grid, camera);
+
   let hoverGridX = -1;
   let hoverGridY = -1;
   let isPointerDown = false;
   let pointerButton = 0;
+
+  // Drag-to-build state
+  let isDraggingTool = false;
+  let dragStartGridX = -1;
+  let dragStartGridY = -1;
+  let dragCurrentGridX = -1;
+  let dragCurrentGridY = -1;
+
+  function isDragTool(tool: string): boolean {
+    return tool.startsWith('zone-') || tool === 'road' || tool === 'demolish';
+  }
 
   function resize() {
     canvas.width = canvas.parentElement!.clientWidth;
@@ -88,7 +106,10 @@ window.addEventListener('DOMContentLoaded', () => {
       hoverDescEl.textContent = 'Uncharted Territory';
     }
 
-    if (isPointerDown && pointerButton === 0) {
+    if (isDraggingTool) {
+      dragCurrentGridX = gridX;
+      dragCurrentGridY = gridY;
+    } else if (isPointerDown && pointerButton === 0) {
       applyTool(gridX, gridY);
     }
   });
@@ -103,13 +124,58 @@ window.addEventListener('DOMContentLoaded', () => {
       camera.startDrag(coords.x, coords.y);
     } else if (e.button === 0) {
       const { gridX, gridY } = camera.screenToWorld(coords.x, coords.y);
-      applyTool(gridX, gridY);
+      if (isDragTool(hud.activeTool)) {
+        isDraggingTool = true;
+        dragStartGridX = gridX;
+        dragStartGridY = gridY;
+        dragCurrentGridX = gridX;
+        dragCurrentGridY = gridY;
+      } else {
+        applyTool(gridX, gridY);
+      }
     }
   });
 
   window.addEventListener('mouseup', () => {
     isPointerDown = false;
     camera.endDrag();
+
+    if (isDraggingTool) {
+      const tool = hud.activeTool;
+
+      if (dragStartGridX === dragCurrentGridX && dragStartGridY === dragCurrentGridY) {
+        applyTool(dragStartGridX, dragStartGridY);
+      } else if (tool === 'road') {
+        // Line road dragging along dominant axis
+        const dx = dragCurrentGridX - dragStartGridX;
+        const dy = dragCurrentGridY - dragStartGridY;
+        if (Math.abs(dx) >= Math.abs(dy)) {
+          const step = dx >= 0 ? 1 : -1;
+          for (let x = dragStartGridX; x !== dragCurrentGridX + step; x += step) {
+            applyTool(x, dragStartGridY);
+          }
+        } else {
+          const step = dy >= 0 ? 1 : -1;
+          for (let y = dragStartGridY; y !== dragCurrentGridY + step; y += step) {
+            applyTool(dragStartGridX, y);
+          }
+        }
+      } else if (isDragTool(tool)) {
+        // Rectangle mass zoning / mass demolition
+        const minX = Math.min(dragStartGridX, dragCurrentGridX);
+        const maxX = Math.max(dragStartGridX, dragCurrentGridX);
+        const minY = Math.min(dragStartGridY, dragCurrentGridY);
+        const maxY = Math.max(dragStartGridY, dragCurrentGridY);
+
+        for (let x = minX; x <= maxX; x++) {
+          for (let y = minY; y <= maxY; y++) {
+            applyTool(x, y);
+          }
+        }
+      }
+
+      isDraggingTool = false;
+    }
   });
 
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -377,7 +443,16 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Main Render Loop (60 FPS)
   function loop() {
-    renderer.render(hoverGridX, hoverGridY, hud.activeTool);
+    const dragPreview = isDraggingTool && isDragTool(hud.activeTool) ? {
+      tool: hud.activeTool,
+      startX: dragStartGridX,
+      startY: dragStartGridY,
+      endX: dragCurrentGridX,
+      endY: dragCurrentGridY
+    } : undefined;
+
+    renderer.render(hoverGridX, hoverGridY, hud.activeTool, dragPreview);
+    minimap.render();
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
