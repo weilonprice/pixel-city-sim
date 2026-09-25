@@ -95,6 +95,10 @@ export class MiniMap {
           color = '#15803d';
         } else if (t.type === TileType.POWER_PLANT || t.type === TileType.WATER_PUMP) {
           color = '#0284c7';
+        } else if (t.type === TileType.BUS_DEPOT) {
+          color = '#0284c7'; // Metro Cyan / Transit Blue
+        } else if (t.type === TileType.BUS_STOP) {
+          color = '#38bdf8'; // Bus stop beacon
         } else if (
           t.type === TileType.FIRE_STATION ||
           t.type === TileType.POLICE_STATION ||

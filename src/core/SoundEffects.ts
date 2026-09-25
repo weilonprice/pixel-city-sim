@@ -258,6 +258,54 @@ class SoundManager {
     osc.stop(t + 0.22);
   }
 
+  // Transit Bus Pneumatic Air Brake hiss & passenger bell
+  public playBusAirBrake() {
+    if (this.isMuted) return;
+    this.initCtx();
+    if (!this.ctx || !this.masterGain) return;
+
+    const t = this.ctx.currentTime;
+
+    // Soft transit chime bell (F#5)
+    const bellOsc = this.ctx.createOscillator();
+    const bellGain = this.ctx.createGain();
+    bellOsc.type = 'sine';
+    bellOsc.frequency.setValueAtTime(740, t);
+    bellGain.gain.setValueAtTime(0.06, t);
+    bellGain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+    bellOsc.connect(bellGain);
+    bellGain.connect(this.masterGain);
+    bellOsc.start(t);
+    bellOsc.stop(t + 0.35);
+
+    // Air release hiss using noise buffer
+    const bufferSize = Math.floor(this.ctx.sampleRate * 0.25);
+    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      output[i] = Math.random() * 2 - 1;
+    }
+
+    const whiteNoise = this.ctx.createBufferSource();
+    whiteNoise.buffer = noiseBuffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(1400, t);
+    filter.frequency.exponentialRampToValueAtTime(400, t + 0.22);
+    filter.Q.setValueAtTime(1.5, t);
+
+    const hissGain = this.ctx.createGain();
+    hissGain.gain.setValueAtTime(0.05, t);
+    hissGain.gain.linearRampToValueAtTime(0.001, t + 0.25);
+
+    whiteNoise.connect(filter);
+    filter.connect(hissGain);
+    hissGain.connect(this.masterGain);
+
+    whiteNoise.start(t);
+  }
+
   // Emergency Siren wail
   public playSiren() {
     if (this.isMuted) return;

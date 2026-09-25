@@ -57,16 +57,16 @@ async function runPlaytest() {
 
   // 2. Test All Toolbar Buttons
   console.log('\n2. Testing Toolbar buttons clickability...');
-  const tools = ['dirt-road', 'road', 'avenue', 'zone-r', 'zone-c', 'zone-i', 'power-plant', 'water-pump', 'fire-station', 'police-station', 'hospital', 'school', 'park', 'demolish', 'inspect'];
+  const tools = ['dirt-road', 'road', 'avenue', 'zone-r', 'zone-c', 'zone-i', 'power-plant', 'water-pump', 'fire-station', 'police-station', 'hospital', 'school', 'park', 'bus-depot', 'bus-stop', 'demolish', 'inspect'];
   for (const tool of tools) {
     await page.click(`button[data-tool="${tool}"]`);
     const activeTool = await page.$eval('.tool-btn.active', el => el.getAttribute('data-tool'));
     if (activeTool !== tool) throw new Error(`Tool ${tool} failed to activate`);
   }
-  console.log('   ✅ All 15 toolbar buttons respond and toggle properly.');
+  console.log('   ✅ All 17 toolbar buttons respond and toggle properly.');
 
   // 3. Playtest Construction: Building a Living Town
-  console.log('\n3. Player Construction: Laying roads, avenues, dirt tracks, zones, and utilities...');
+  console.log('\n3. Player Construction: Laying roads, avenues, dirt tracks, zones, transit network, and utilities...');
 
   const constructCode = `(() => {
     const game = window.game;
@@ -116,6 +116,15 @@ async function runPlaytest() {
     game.hud.activeTool = 'park';
     game.applyTool(30, 29);
 
+    // Municipal Bus Transit Network (Bus Depot + Roadside Bus Stops)
+    game.hud.activeTool = 'bus-depot';
+    game.applyTool(29, 23);
+
+    game.hud.activeTool = 'bus-stop';
+    game.applyTool(27, 21);
+    game.applyTool(35, 21);
+    game.applyTool(29, 26);
+
     // D. Zone Residential Neighborhoods (directly touching roads)
     game.hud.activeTool = 'zone-r';
     // North residential block (touching y=22 boulevard)
@@ -158,9 +167,14 @@ async function runPlaytest() {
     game.camera.centerOnTile(30, 23, 1280, 700);
     game.camera.zoom = 1.35;
 
+    // Trigger initial simulation tick to update utilities and metrics
+    game.engine.tick();
+
     const avenueTile = game.grid.getTile(25, 22);
     const dirtRoadTile = game.grid.getTile(20, 28);
     const pavedRoadTile = game.grid.getTile(30, 20);
+    const depotTile = game.grid.getTile(29, 23);
+    const stopTile = game.grid.getTile(27, 21);
 
     return {
       success: true,
@@ -169,7 +183,12 @@ async function runPlaytest() {
       dirtRoadType: dirtRoadTile ? dirtRoadTile.type : null,
       pavedRoadType: pavedRoadTile ? pavedRoadTile.type : null,
       avenueConnected: avenueTile ? avenueTile.connectedToHighway : false,
-      dirtConnected: dirtRoadTile ? dirtRoadTile.connectedToHighway : false
+      dirtConnected: dirtRoadTile ? dirtRoadTile.connectedToHighway : false,
+      depotType: depotTile ? depotTile.type : null,
+      stopType: stopTile ? stopTile.type : null,
+      busDepotCount: game.engine.busDepotCount,
+      busStopCount: game.engine.busStopCount,
+      stopTransitCoverage: stopTile ? stopTile.transitCoverage : 0
     };
   })()`;
 
@@ -181,24 +200,33 @@ async function runPlaytest() {
     pavedRoadType: string;
     avenueConnected: boolean;
     dirtConnected: boolean;
+    depotType: string;
+    stopType: string;
+    busDepotCount: number;
+    busStopCount: number;
+    stopTransitCoverage: number;
   };
   console.log(`   ✅ Construction completed. Remaining funds: $${constructTownResult.fundsAfterBuild.toLocaleString()}`);
   console.log(`   Road Hierarchy Verified: Avenue=${constructTownResult.avenueType} (Hwy:${constructTownResult.avenueConnected ? '✅' : '❌'}), Dirt=${constructTownResult.dirtRoadType} (Hwy:${constructTownResult.dirtConnected ? '✅' : '❌'}), Paved=${constructTownResult.pavedRoadType}`);
+  console.log(`   Transit Network Verified: Depot=${constructTownResult.depotType} (${constructTownResult.busDepotCount} Depots), Stops=${constructTownResult.stopType} (${constructTownResult.busStopCount} Stops, Stop Cov: ${constructTownResult.stopTransitCoverage}%)`);
 
   if (constructTownResult.avenueType !== 'AVENUE') throw new Error(`Expected AVENUE type, got ${constructTownResult.avenueType}`);
   if (constructTownResult.dirtRoadType !== 'DIRT_ROAD') throw new Error(`Expected DIRT_ROAD type, got ${constructTownResult.dirtRoadType}`);
   if (constructTownResult.pavedRoadType !== 'ROAD') throw new Error(`Expected ROAD type, got ${constructTownResult.pavedRoadType}`);
   if (!constructTownResult.avenueConnected || !constructTownResult.dirtConnected) throw new Error('Avenue or Dirt Road failed to connect to highway!');
+  if (constructTownResult.depotType !== 'BUS_DEPOT') throw new Error(`Expected BUS_DEPOT, got ${constructTownResult.depotType}`);
+  if (constructTownResult.stopType !== 'BUS_STOP') throw new Error(`Expected BUS_STOP, got ${constructTownResult.stopType}`);
+  if (constructTownResult.busDepotCount < 1 || constructTownResult.busStopCount < 2) throw new Error('Transit depots or stops not counted in engine!');
 
   // Take screenshot immediately after layout
   await page.screenshot({ path: path.join(projectRoot, 'playtest_step1_layout.png') });
 
   // 4. Advance Simulation Time at 3x Speed
-  console.log('\n4. Accelerating simulation at 3x speed to allow citizens to move in...');
+  console.log('\n4. Accelerating simulation at 3x speed to allow citizens to move in and ride transit...');
   await page.click('#btn-speed-3');
 
   // Wait and monitor simulation progress until population flourishes
-  let finalStats = { pop: 0, jobs: 0, funds: 0 };
+  let finalStats = { pop: 0, jobs: 0, funds: 0, ridership: 0, buses: 0 };
   for (let i = 1; i <= 6; i++) {
     await sleep(3000);
     finalStats = await page.evaluate(`(() => {
@@ -206,10 +234,12 @@ async function runPlaytest() {
       return {
         pop: g.engine.population,
         jobs: g.engine.totalJobs,
-        funds: g.engine.funds
+        funds: g.engine.funds,
+        ridership: g.engine.busRidership,
+        buses: g.renderer && g.renderer.vehicles ? g.renderer.vehicles.filter(v => v.isBus).length : 0
       };
-    })()`) as { pop: number; jobs: number; funds: number };
-    console.log(`   [Sim Check ${i} (+${i * 3}s)] Pop: ${finalStats.pop} | Jobs: ${finalStats.jobs} | Funds: $${finalStats.funds.toLocaleString()}`);
+    })()`) as { pop: number; jobs: number; funds: number; ridership: number; buses: number };
+    console.log(`   [Sim Check ${i} (+${i * 3}s)] Pop: ${finalStats.pop} | Jobs: ${finalStats.jobs} | Transit Riders: ${finalStats.ridership} | City Buses: ${finalStats.buses} | Funds: $${finalStats.funds.toLocaleString()}`);
     if (finalStats.pop > 0 && finalStats.jobs > 0 && i >= 3) {
       break;
     }
@@ -231,13 +261,13 @@ async function runPlaytest() {
   console.log(`   📸 Captured screenshot: ${thrivingScreenshot}`);
 
   // 6. Test Data Overlays
-  console.log('\n5. Testing all 7 Data Heatmap Overlays...');
-  const overlayModes = ['POWER', 'WATER', 'FIRE', 'CRIME', 'LAND_VALUE', 'POLLUTION', 'NORMAL'];
+  console.log('\n6. Testing all 8 Data Heatmap Overlays (including Public Transit)...');
+  const overlayModes = ['POWER', 'WATER', 'FIRE', 'CRIME', 'LAND_VALUE', 'POLLUTION', 'TRANSIT', 'NORMAL'];
   for (const mode of overlayModes) {
     await page.select('#overlay-select', mode);
-    await sleep(300);
+    await sleep(200);
   }
-  console.log('   ✅ All 7 data overlays rendered with zero shader/canvas issues.');
+  console.log('   ✅ All 8 data overlays rendered with zero shader/canvas issues.');
 
   // 7. Test Retro News Ticker
   console.log('\n7. Testing Retro News Ticker...');
@@ -282,8 +312,9 @@ async function runPlaytest() {
   // Verify financial ledger values
   const totalRev = await page.$eval('#budget-total-rev', el => el.textContent);
   const totalExp = await page.$eval('#budget-total-exp', el => el.textContent);
+  const transitCost = await page.$eval('#fund-transit-cost', el => el.textContent);
   const netFlow = await page.$eval('#budget-net-flow', el => el.textContent);
-  console.log(`   Ledger breakdown: Revenue = ${totalRev}, Expenses = ${totalExp}, Net Cash Flow = ${netFlow}`);
+  console.log(`   Ledger breakdown: Revenue = ${totalRev}, Expenses = ${totalExp}, Transit Upkeep = ${transitCost}, Net Cash Flow = ${netFlow}`);
 
   // Test slider adjustments & reactive demand/radius scaling
   const budgetTestResult = await page.evaluate(`(() => {
@@ -425,10 +456,11 @@ async function runPlaytest() {
   const popBeforeSave = await page.$eval('#pop-value', el => el.textContent);
   console.log(`\n10. Testing LocalStorage Save & Load (Population at Save: ${popBeforeSave})...`);
   
-  // Set custom tax rate before save
+  // Set custom tax rate and transit funding before save
   await page.evaluate(`(() => {
     window.game.engine.taxRateR = 7;
     window.game.engine.fundingFire = 125;
+    window.game.engine.fundingTransit = 135;
   })()`);
 
   await page.click('#btn-save');
@@ -452,17 +484,19 @@ async function runPlaytest() {
     return {
       taxRateR: e.taxRateR,
       fundingFire: e.fundingFire,
+      fundingTransit: e.fundingTransit,
+      busRidership: e.busRidership,
       weather: e.weather,
       smokeDetectors: e.ordinances.smokeDetectors,
       freeTransit: e.ordinances.freeTransit
     };
-  })()`) as { taxRateR: number; fundingFire: number; weather: string; smokeDetectors: boolean; freeTransit: boolean };
+  })()`) as { taxRateR: number; fundingFire: number; fundingTransit: number; busRidership: number; weather: string; smokeDetectors: boolean; freeTransit: boolean };
 
-  console.log(`   Restored Tax Rate R: ${restoredState.taxRateR}%, Fire Funding: ${restoredState.fundingFire}%`);
+  console.log(`   Restored Tax Rate R: ${restoredState.taxRateR}%, Fire Funding: ${restoredState.fundingFire}%, Transit Funding: ${restoredState.fundingTransit}%`);
   console.log(`   Restored Weather: ${restoredState.weather}`);
   console.log(`   Restored Ordinances: smokeDetectors=${restoredState.smokeDetectors}, freeTransit=${restoredState.freeTransit}`);
 
-  if (restoredState.taxRateR !== 7 || restoredState.fundingFire !== 125) {
+  if (restoredState.taxRateR !== 7 || restoredState.fundingFire !== 125 || restoredState.fundingTransit !== 135) {
     throw new Error('Save/load failed to restore budget tax/funding rates!');
   }
   if (restoredState.weather !== 'THUNDERSTORM') {
@@ -477,21 +511,29 @@ async function runPlaytest() {
     throw new Error(`Weather badge UI not updated after load! Expected Storm, got ${restoredWeatherBadge}`);
   }
 
-  const restoredRoadTypes = await page.evaluate(`(() => {
+  const restoredRoadAndTransitTypes = await page.evaluate(`(() => {
     const g = window.game;
     return {
       avenueType: g.grid.getTile(25, 22)?.type,
       dirtRoadType: g.grid.getTile(20, 28)?.type,
-      pavedRoadType: g.grid.getTile(30, 20)?.type
+      pavedRoadType: g.grid.getTile(30, 20)?.type,
+      depotType: g.grid.getTile(29, 23)?.type,
+      stopType: g.grid.getTile(27, 21)?.type,
+      depotCount: g.engine.busDepotCount,
+      stopCount: g.engine.busStopCount
     };
-  })()`) as { avenueType: string; dirtRoadType: string; pavedRoadType: string };
+  })()`) as { avenueType: string; dirtRoadType: string; pavedRoadType: string; depotType: string; stopType: string; depotCount: number; stopCount: number };
 
-  if (restoredRoadTypes.avenueType !== 'AVENUE' || restoredRoadTypes.dirtRoadType !== 'DIRT_ROAD' || restoredRoadTypes.pavedRoadType !== 'ROAD') {
-    throw new Error(`Road hierarchy failed to persist! Got: ave=${restoredRoadTypes.avenueType}, dirt=${restoredRoadTypes.dirtRoadType}, road=${restoredRoadTypes.pavedRoadType}`);
+  if (restoredRoadAndTransitTypes.avenueType !== 'AVENUE' || restoredRoadAndTransitTypes.dirtRoadType !== 'DIRT_ROAD' || restoredRoadAndTransitTypes.pavedRoadType !== 'ROAD') {
+    throw new Error(`Road hierarchy failed to persist! Got: ave=${restoredRoadAndTransitTypes.avenueType}, dirt=${restoredRoadAndTransitTypes.dirtRoadType}, road=${restoredRoadAndTransitTypes.pavedRoadType}`);
+  }
+  if (restoredRoadAndTransitTypes.depotType !== 'BUS_DEPOT' || restoredRoadAndTransitTypes.stopType !== 'BUS_STOP') {
+    throw new Error(`Transit structures failed to persist! Got: depot=${restoredRoadAndTransitTypes.depotType}, stop=${restoredRoadAndTransitTypes.stopType}`);
   }
 
-  console.log(`   Restored Road Hierarchy: Avenue=${restoredRoadTypes.avenueType}, Dirt Road=${restoredRoadTypes.dirtRoadType}, Paved Road=${restoredRoadTypes.pavedRoadType}`);
-  console.log('   ✅ Save & Load verified with exact state, budget, weather, ordinances & road hierarchy restoration.');
+  console.log(`   Restored Road Hierarchy: Avenue=${restoredRoadAndTransitTypes.avenueType}, Dirt Road=${restoredRoadAndTransitTypes.dirtRoadType}, Paved Road=${restoredRoadAndTransitTypes.pavedRoadType}`);
+  console.log(`   Restored Transit Network: Depot=${restoredRoadAndTransitTypes.depotType} (${restoredRoadAndTransitTypes.depotCount}), Stop=${restoredRoadAndTransitTypes.stopType} (${restoredRoadAndTransitTypes.stopCount})`);
+  console.log('   ✅ Save & Load verified with exact state, budget, transit, weather, ordinances & road hierarchy restoration.');
 
   // 11. Test Ambient Audio & Mute Controls
   console.log('\n11. Testing Audio Mute Controls & Ambient Soundscape...');

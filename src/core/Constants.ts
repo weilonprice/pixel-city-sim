@@ -24,7 +24,9 @@ export enum TileType {
   FIRE_STATION = 'FIRE_STATION',
   POLICE_STATION = 'POLICE_STATION',
   HOSPITAL = 'HOSPITAL',
-  SCHOOL = 'SCHOOL'
+  SCHOOL = 'SCHOOL',
+  BUS_DEPOT = 'BUS_DEPOT',
+  BUS_STOP = 'BUS_STOP'
 }
 
 export function isAnyRoad(type: TileType): boolean {
@@ -38,7 +40,8 @@ export enum OverlayMode {
   FIRE = 'FIRE',
   CRIME = 'CRIME',
   LAND_VALUE = 'LAND_VALUE',
-  POLLUTION = 'POLLUTION'
+  POLLUTION = 'POLLUTION',
+  TRANSIT = 'TRANSIT'
 }
 
 export enum WeatherType {
@@ -103,6 +106,7 @@ export interface Tile {
   policeCoverage: number;
   healthCoverage: number;
   educationCoverage: number;
+  transitCoverage: number;
 
   variant: number;
 }
@@ -122,7 +126,9 @@ export const COSTS = {
   FIRE_STATION: 600,
   POLICE_STATION: 600,
   HOSPITAL: 850,
-  SCHOOL: 500
+  SCHOOL: 500,
+  BUS_DEPOT: 400,
+  BUS_STOP: 50
 } as const;
 
 export const UPKEEP = {
@@ -138,5 +144,7 @@ export const UPKEEP = {
   FIRE_STATION: 20,
   POLICE_STATION: 20,
   HOSPITAL: 30,
-  SCHOOL: 18
+  SCHOOL: 18,
+  BUS_DEPOT: 15,
+  BUS_STOP: 1
 } as const;

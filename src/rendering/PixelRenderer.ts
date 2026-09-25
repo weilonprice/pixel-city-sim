@@ -34,6 +34,9 @@ interface Vehicle {
   speed: number;
   isTruck?: boolean;
   isEmergency?: 'fire' | 'police';
+  isBus?: boolean;
+  passengers?: number;
+  dwellTimer?: number;
 }
 
 export class PixelRenderer {
@@ -43,7 +46,7 @@ export class PixelRenderer {
   private engine: SimulationEngine;
   private animFrame: number = 0;
   private particles: Particle[] = [];
-  private vehicles: Vehicle[] = [];
+  public vehicles: Vehicle[] = [];
   private rainDrops: { x: number; y: number; speed: number; len: number }[] = [];
   private lightningFlash: number = 0;
 
@@ -166,6 +169,10 @@ export class PixelRenderer {
       this.drawHospital(sx, sy, halfW, halfH);
     } else if (tile.type === TileType.SCHOOL) {
       this.drawSchool(sx, sy, halfW, halfH);
+    } else if (tile.type === TileType.BUS_DEPOT) {
+      this.drawBusDepot(sx, sy, halfW, halfH);
+    } else if (tile.type === TileType.BUS_STOP) {
+      this.drawBusStop(sx, sy, halfW, halfH);
     } else if (tile.building) {
       this.drawBuilding(sx, sy, halfW, halfH, tile);
     }
@@ -195,6 +202,9 @@ export class PixelRenderer {
     } else if (mode === OverlayMode.POLLUTION) {
       const pol = tile.pollution / 100;
       color = pol > 0.05 ? `rgba(168, 85, 247, ${pol * 0.65})` : null;
+    } else if (mode === OverlayMode.TRANSIT) {
+      const cov = tile.transitCoverage / 100;
+      color = cov > 0 ? `rgba(6, 182, 212, ${Math.min(0.65, 0.15 + cov * 0.5)})` : null;
     }
 
     if (color) {
@@ -867,6 +877,147 @@ export class PixelRenderer {
     this.ctx.stroke();
   }
 
+  private drawBusDepot(sx: number, sy: number, hw: number, hh: number) {
+    const z = this.camera.zoom;
+    if (assetManager.hasSprite('bus_depot')) {
+      const img = assetManager.getSprite('bus_depot')!;
+      const w = img.naturalWidth * z;
+      const h = img.naturalHeight * z;
+      this.ctx.drawImage(img, sx - w / 2, sy + hh - h, w, h);
+      return;
+    }
+
+    // Concrete bus depot yard slab
+    this.ctx.fillStyle = '#475569';
+    this.ctx.beginPath();
+    this.ctx.moveTo(sx, sy - hh);
+    this.ctx.lineTo(sx + hw, sy);
+    this.ctx.lineTo(sx, sy + hh);
+    this.ctx.lineTo(sx - hw, sy);
+    this.ctx.closePath();
+    this.ctx.fill();
+
+    // Yellow chevron bus bay parking markings on yard
+    this.ctx.strokeStyle = '#eab308';
+    this.ctx.lineWidth = Math.max(1, 1.5 * z);
+    this.ctx.beginPath();
+    this.ctx.moveTo(sx - 10 * z, sy + 4 * z);
+    this.ctx.lineTo(sx - 2 * z, sy + 8 * z);
+    this.ctx.lineTo(sx + 6 * z, sy + 4 * z);
+    this.ctx.stroke();
+
+    // Main 2-story municipal garage structure
+    const height = 32 * z;
+    this.drawIsometricBox(sx, sy - 4 * z, hw * 0.72, hh * 0.65, height, '#334155', '#1e293b', '#0f172a');
+
+    // Dual roll-up bus maintenance garage doors
+    this.ctx.fillStyle = '#94a3b8';
+    this.ctx.fillRect(sx - 14 * z, sy - 14 * z, 11 * z, 10 * z);
+    this.ctx.fillRect(sx + 3 * z, sy - 14 * z, 11 * z, 10 * z);
+
+    // Garage door horizontal slats & safety yellow headers
+    this.ctx.fillStyle = '#facc15';
+    this.ctx.fillRect(sx - 14 * z, sy - 15 * z, 11 * z, 2 * z);
+    this.ctx.fillRect(sx + 3 * z, sy - 15 * z, 11 * z, 2 * z);
+
+    // Rooftop HVAC industrial exhaust units
+    this.ctx.fillStyle = '#64748b';
+    this.ctx.fillRect(sx - 6 * z, sy - height - 10 * z, 5 * z, 5 * z);
+    this.ctx.fillRect(sx + 2 * z, sy - height - 8 * z, 4 * z, 4 * z);
+
+    // Illuminated "TRANSIT / METRO" depot sign
+    this.ctx.fillStyle = '#0284c7';
+    this.ctx.fillRect(sx - 12 * z, sy - height * 0.7, 24 * z, 4 * z);
+    this.ctx.fillStyle = '#ffffff';
+    this.ctx.font = `bold ${Math.max(6, Math.floor(6 * z))}px sans-serif`;
+    this.ctx.textAlign = 'center';
+    this.ctx.textBaseline = 'middle';
+    this.ctx.fillText('METRO', sx, sy - height * 0.7 + 2 * z);
+  }
+
+  private drawBusStop(sx: number, sy: number, hw: number, hh: number) {
+    const z = this.camera.zoom;
+    if (assetManager.hasSprite('bus_stop')) {
+      const img = assetManager.getSprite('bus_stop')!;
+      const w = img.naturalWidth * z;
+      const h = img.naturalHeight * z;
+      this.ctx.drawImage(img, sx - w / 2, sy + hh - h, w, h);
+      return;
+    }
+
+    // Concrete passenger platform curb
+    this.ctx.fillStyle = '#94a3b8';
+    this.ctx.beginPath();
+    this.ctx.moveTo(sx, sy - hh * 0.6);
+    this.ctx.lineTo(sx + hw * 0.7, sy);
+    this.ctx.lineTo(sx + hh * 0.6, sy + hh * 0.6);
+    this.ctx.lineTo(sx - hw * 0.7, sy);
+    this.ctx.closePath();
+    this.ctx.fill();
+
+    // Tactile yellow safety strip along curb edge
+    this.ctx.strokeStyle = '#facc15';
+    this.ctx.lineWidth = Math.max(1, 1.5 * z);
+    this.ctx.beginPath();
+    this.ctx.moveTo(sx - hw * 0.55, sy);
+    this.ctx.lineTo(sx, sy + hh * 0.5);
+    this.ctx.lineTo(sx + hw * 0.55, sy);
+    this.ctx.stroke();
+
+    // Modern Curved Glass Transit Shelter
+    const shelterH = 20 * z;
+    const shelterW = 18 * z;
+
+    // Steel support frame
+    this.ctx.strokeStyle = '#1e293b';
+    this.ctx.lineWidth = Math.max(1, 2 * z);
+    this.ctx.beginPath();
+    this.ctx.moveTo(sx - shelterW / 2, sy);
+    this.ctx.lineTo(sx - shelterW / 2, sy - shelterH);
+    this.ctx.lineTo(sx + shelterW / 2, sy - shelterH);
+    this.ctx.lineTo(sx + shelterW / 2, sy);
+    this.ctx.stroke();
+
+    // Translucent teal/glass back panel
+    this.ctx.fillStyle = 'rgba(186, 230, 253, 0.7)';
+    this.ctx.fillRect(sx - shelterW / 2 + 1 * z, sy - shelterH, shelterW - 2 * z, shelterH * 0.85);
+
+    // Wooden passenger bench inside shelter
+    this.ctx.fillStyle = '#b45309';
+    this.ctx.fillRect(sx - 6 * z, sy - 5 * z, 12 * z, 2.5 * z);
+    this.ctx.fillStyle = '#1e293b';
+    this.ctx.fillRect(sx - 5 * z, sy - 2.5 * z, 1.5 * z, 2.5 * z);
+    this.ctx.fillRect(sx + 3.5 * z, sy - 2.5 * z, 1.5 * z, 2.5 * z);
+
+    // Bus stop timetable pole & round "🚏" sign
+    const poleX = sx + hw * 0.45;
+    const poleY = sy - 4 * z;
+    this.ctx.strokeStyle = '#475569';
+    this.ctx.lineWidth = Math.max(1, 1.5 * z);
+    this.ctx.beginPath();
+    this.ctx.moveTo(poleX, poleY);
+    this.ctx.lineTo(poleX, poleY - 22 * z);
+    this.ctx.stroke();
+
+    // Round Transit lollipop badge
+    this.ctx.fillStyle = '#0284c7';
+    this.ctx.beginPath();
+    this.ctx.arc(poleX, poleY - 22 * z, 4 * z, 0, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.strokeStyle = '#ffffff';
+    this.ctx.lineWidth = Math.max(1, 1 * z);
+    this.ctx.stroke();
+
+    // Waiting commuter silhouette under shelter
+    if (this.animFrame % 60 < 45) {
+      this.ctx.fillStyle = '#334155';
+      this.ctx.beginPath();
+      this.ctx.arc(sx - 1 * z, sy - 9 * z, 2 * z, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.fillRect(sx - 2.5 * z, sy - 7 * z, 3 * z, 5 * z);
+    }
+  }
+
   /**
    * Procedural or PixelLab Sprite Buildings
    */
@@ -1531,6 +1682,46 @@ export class PixelRenderer {
       }
     }
 
+    // 3. Municipal Bus Transit Fleet
+    if (this.engine.busDepotCount > 0 && this.engine.busStopCount > 0) {
+      const busCount = this.vehicles.filter(v => v.isBus).length;
+      const maxBuses = Math.min(6, Math.max(1, this.engine.busDepotCount * 2 + Math.floor(this.engine.busStopCount / 2)));
+      if (busCount < maxBuses && Math.random() < 0.08) {
+        const transitRoadTiles: Tile[] = [];
+        for (let x = 0; x < this.grid.size; x++) {
+          for (let y = 0; y < this.grid.size; y++) {
+            const t = this.grid.getTile(x, y);
+            if (t && isAnyRoad(t.type) && t.type !== TileType.HIGHWAY && t.connectedToHighway) {
+              const neighbors = this.grid.getNeighbors(x, y);
+              const hasTransit = neighbors.some(n => n.tile.type === TileType.BUS_STOP || n.tile.type === TileType.BUS_DEPOT);
+              if (hasTransit) transitRoadTiles.push(t);
+            }
+          }
+        }
+
+        const candidateTiles = transitRoadTiles.length > 0 ? transitRoadTiles : null;
+        if (candidateTiles) {
+          const start = candidateTiles[Math.floor(Math.random() * candidateTiles.length)];
+          const neighbors = this.grid.getNeighbors(start.x, start.y).filter(n => isAnyRoad(n.tile.type));
+          if (neighbors.length > 0) {
+            const target = neighbors[Math.floor(Math.random() * neighbors.length)].tile;
+            this.vehicles.push({
+              id: Math.random().toString(),
+              x: start.x,
+              y: start.y,
+              targetX: target.x,
+              targetY: target.y,
+              color: '#0284c7',
+              speed: 0.035,
+              isBus: true,
+              passengers: Math.floor(Math.random() * 25) + 5,
+              dwellTimer: 0
+            });
+          }
+        }
+      }
+    }
+
     // Update & draw vehicles
     const z = this.camera.zoom;
     for (let i = this.vehicles.length - 1; i >= 0; i--) {
@@ -1539,41 +1730,58 @@ export class PixelRenderer {
       const dy = v.targetY - v.y;
       const dist = Math.hypot(dx, dy);
 
-      if (dist < v.speed) {
-        v.x = v.targetX;
-        v.y = v.targetY;
+      // If bus is dwelling at a stop, pause movement and countdown
+      if (v.dwellTimer && v.dwellTimer > 0) {
+        v.dwellTimer--;
+      } else {
+        if (dist < v.speed) {
+          v.x = v.targetX;
+          v.y = v.targetY;
 
-        if (v.y === highwayY) {
-          const nextX = v.x + (dx >= 0 ? 1 : -1);
-          if (nextX >= 0 && nextX < this.grid.size) {
-            v.targetX = nextX;
-            v.targetY = highwayY;
-          } else {
-            this.vehicles.splice(i, 1);
-            continue;
-          }
-        } else {
-          const neighbors = this.grid.getNeighbors(v.targetX, v.targetY).filter(n => isAnyRoad(n.tile.type));
-          if (neighbors.length > 0) {
-            const next = neighbors[Math.floor(Math.random() * neighbors.length)].tile;
-            v.targetX = next.x;
-            v.targetY = next.y;
-            // Dynamically scale vehicle speed based on road type
-            if (next.type === TileType.AVENUE) {
-              v.speed = v.isEmergency ? 0.07 : 0.05;
-            } else if (next.type === TileType.DIRT_ROAD) {
-              v.speed = v.isEmergency ? 0.045 : 0.025;
+          if (v.y === highwayY) {
+            const nextX = v.x + (dx >= 0 ? 1 : -1);
+            if (nextX >= 0 && nextX < this.grid.size) {
+              v.targetX = nextX;
+              v.targetY = highwayY;
             } else {
-              v.speed = v.isEmergency ? 0.055 : 0.035;
+              this.vehicles.splice(i, 1);
+              continue;
             }
           } else {
-            this.vehicles.splice(i, 1);
-            continue;
+            const neighbors = this.grid.getNeighbors(v.targetX, v.targetY).filter(n => isAnyRoad(n.tile.type));
+            if (neighbors.length > 0) {
+              const next = neighbors[Math.floor(Math.random() * neighbors.length)].tile;
+              v.targetX = next.x;
+              v.targetY = next.y;
+
+              // Check if bus should dwell at adjacent bus stop
+              if (v.isBus) {
+                const nearStop = this.grid.getNeighbors(v.targetX, v.targetY).some(n => n.tile.type === TileType.BUS_STOP);
+                if (nearStop && Math.random() < 0.4) {
+                  v.dwellTimer = 35; // ~0.6s boarding dwell
+                  if (Math.random() < 0.3) {
+                    sounds.playBusAirBrake();
+                  }
+                }
+              }
+
+              // Dynamically scale vehicle speed based on road type
+              if (next.type === TileType.AVENUE) {
+                v.speed = v.isEmergency ? 0.07 : (v.isBus ? 0.045 : 0.05);
+              } else if (next.type === TileType.DIRT_ROAD) {
+                v.speed = v.isEmergency ? 0.045 : (v.isBus ? 0.022 : 0.025);
+              } else {
+                v.speed = v.isEmergency ? 0.055 : (v.isBus ? 0.035 : 0.035);
+              }
+            } else {
+              this.vehicles.splice(i, 1);
+              continue;
+            }
           }
+        } else {
+          v.x += (dx / dist) * v.speed;
+          v.y += (dy / dist) * v.speed;
         }
-      } else {
-        v.x += (dx / dist) * v.speed;
-        v.y += (dy / dist) * v.speed;
       }
 
       const { x: sx, y: sy } = this.camera.worldToScreen(v.x, v.y, 0);
@@ -1594,6 +1802,66 @@ export class PixelRenderer {
         const sirenColor = (this.animFrame % 16 < 8) ? '#ef4444' : '#38bdf8';
         this.ctx.fillStyle = sirenColor;
         this.ctx.fillRect(sx - 1 * z, sy - 4 * z, 2 * z, 2 * z);
+        continue;
+      }
+
+      // City Transit Bus
+      if (v.isBus) {
+        if (assetManager.hasSprite('city_bus')) {
+          const img = assetManager.getSprite('city_bus')!;
+          const w = 32 * z;
+          const h = 22 * z;
+          this.ctx.drawImage(img, sx - w / 2, sy - h * 0.7, w, h);
+        } else {
+          // Retro municipal city transit bus (long body, two-tone livery)
+          const busW = 28 * z;
+          const busH = 10 * z;
+          const busY = sy - 4 * z;
+
+          // Wheels
+          this.ctx.fillStyle = '#0f172a';
+          this.ctx.fillRect(sx - busW * 0.38, busY + busH - 1 * z, 4 * z, 3 * z);
+          this.ctx.fillRect(sx + busW * 0.22, busY + busH - 1 * z, 5 * z, 3 * z);
+          this.ctx.fillStyle = '#94a3b8';
+          this.ctx.fillRect(sx - busW * 0.38 + 1 * z, busY + busH, 2 * z, 1.5 * z);
+          this.ctx.fillRect(sx + busW * 0.22 + 1 * z, busY + busH, 3 * z, 1.5 * z);
+
+          // Lower chassis - Metro Cyan / Transit Blue
+          this.ctx.fillStyle = '#0284c7';
+          this.ctx.fillRect(sx - busW / 2, busY + busH * 0.45, busW, busH * 0.55);
+
+          // Upper body - Clean White
+          this.ctx.fillStyle = '#f8fafc';
+          this.ctx.fillRect(sx - busW / 2, busY, busW, busH * 0.45);
+
+          // Dark tinted passenger windows
+          this.ctx.fillStyle = '#0f172a';
+          const winStartX = sx - busW / 2 + 3 * z;
+          const winW = 3.5 * z;
+          const winH = 3 * z;
+          for (let wIdx = 0; wIdx < 4; wIdx++) {
+            this.ctx.fillRect(winStartX + wIdx * 5 * z, busY + 1.5 * z, winW, winH);
+          }
+
+          // Amber LED destination sign marquee ("METRO")
+          this.ctx.fillStyle = '#f59e0b';
+          this.ctx.fillRect(sx + busW / 2 - 4 * z, busY + 1.5 * z, 3 * z, 2.5 * z);
+
+          // Headlights and Taillights
+          this.ctx.fillStyle = '#fef08a';
+          this.ctx.fillRect(sx + busW / 2 - 1 * z, busY + busH * 0.6, 1.5 * z, 2 * z);
+          this.ctx.fillStyle = '#ef4444';
+          this.ctx.fillRect(sx - busW / 2 - 0.5 * z, busY + busH * 0.6, 1 * z, 2 * z);
+        }
+
+        // Animated passenger boarding indicator when dwelling
+        if (v.dwellTimer && v.dwellTimer > 0) {
+          const bounce = Math.sin(this.animFrame * 0.2) * 2;
+          this.ctx.fillStyle = '#0284c7';
+          this.ctx.font = `bold ${Math.max(9, Math.floor(9 * z))}px sans-serif`;
+          this.ctx.textAlign = 'center';
+          this.ctx.fillText('🚏', sx, sy - 14 * z + bounce);
+        }
         continue;
       }
 

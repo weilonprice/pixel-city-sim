@@ -13,6 +13,7 @@ export interface FinancialLedger {
   expensePolice: number;
   expenseHealth: number;
   expenseEducation: number;
+  expenseTransit: number;
   expenseUtilities: number;
   expenseOrdinances: number;
   totalExpenses: number;
@@ -25,6 +26,12 @@ export class SimulationEngine {
   public funds: number = 20000;
   public population: number = 0;
   public totalJobs: number = 0;
+
+  // Transit Stats
+  public fundingTransit: number = 100; // 50 to 150 %
+  public busRidership: number = 0;
+  public busStopCount: number = 0;
+  public busDepotCount: number = 0;
 
   // RCI Demands (-100 to +100)
   public demandR: number = 60;
@@ -127,16 +134,20 @@ export class SimulationEngine {
         this.fundingPolice,
         this.fundingHealth,
         this.fundingEducation,
+        this.fundingTransit,
         this.ordinances
       );
 
-      // 3. Process Building Growth & Fire Emergencies (every 5 ticks)
+      // 3. Update Public Transit metrics
+      this.updateTransitMetrics();
+
+      // 4. Process Building Growth & Fire Emergencies (every 5 ticks)
       if (this.tickCount % 5 === 0) {
         this.processZoningAndGrowth();
         this.processFireEmergencies();
       }
 
-      // 4. Monthly Financial Cycle (every 30 ticks)
+      // 5. Monthly Financial Cycle (every 30 ticks)
       if (this.tickCount % 30 === 0) {
         this.processMonthlyFinances();
       }
@@ -152,7 +163,7 @@ export class SimulationEngine {
     return `${this.months[this.month]} ${this.year} • ${pad(this.gameHour)}:${pad(this.gameMinute)}`;
   }
 
-  private updateUtilities() {
+  public updateUtilities() {
     const size = this.grid.size;
 
     for (let x = 0; x < size; x++) {
@@ -190,7 +201,7 @@ export class SimulationEngine {
 
       for (const n of neighbors) {
         const t = n.tile;
-        if (!t.powered && (isAnyRoad(t.type) || t.type === TileType.PARK || t.type === TileType.POWER_PLANT || t.type === TileType.WATER_PUMP || t.type === TileType.FIRE_STATION || t.type === TileType.POLICE_STATION || t.type === TileType.HOSPITAL || t.type === TileType.SCHOOL || t.building)) {
+        if (!t.powered && (isAnyRoad(t.type) || t.type === TileType.PARK || t.type === TileType.POWER_PLANT || t.type === TileType.WATER_PUMP || t.type === TileType.FIRE_STATION || t.type === TileType.POLICE_STATION || t.type === TileType.HOSPITAL || t.type === TileType.SCHOOL || t.type === TileType.BUS_DEPOT || t.type === TileType.BUS_STOP || t.building)) {
           t.powered = true;
           if (t.building) t.building.powered = true;
           powerQueue.push(t);
@@ -204,7 +215,7 @@ export class SimulationEngine {
 
       for (const n of neighbors) {
         const t = n.tile;
-        if (!t.watered && (isAnyRoad(t.type) || t.type === TileType.PARK || t.type === TileType.WATER_PUMP || t.type === TileType.FIRE_STATION || t.type === TileType.POLICE_STATION || t.type === TileType.HOSPITAL || t.type === TileType.SCHOOL || t.building)) {
+        if (!t.watered && (isAnyRoad(t.type) || t.type === TileType.PARK || t.type === TileType.WATER_PUMP || t.type === TileType.FIRE_STATION || t.type === TileType.POLICE_STATION || t.type === TileType.HOSPITAL || t.type === TileType.SCHOOL || t.type === TileType.BUS_DEPOT || t.type === TileType.BUS_STOP || t.building)) {
           t.watered = true;
           if (t.building) t.building.watered = true;
           waterQueue.push(t);
@@ -213,6 +224,42 @@ export class SimulationEngine {
     }
 
     this.grid.updateHighwayConnectivity();
+  }
+
+  public updateTransitMetrics() {
+    const size = this.grid.size;
+    let busDepots = 0;
+    let busStops = 0;
+    let coveredPop = 0;
+    let coveredJobs = 0;
+
+    for (let x = 0; x < size; x++) {
+      for (let y = 0; y < size; y++) {
+        const t = this.grid.tiles[x][y];
+        if (t.type === TileType.BUS_DEPOT && t.powered && t.watered && this.grid.isAdjacentToRoad(x, y)) {
+          busDepots++;
+        } else if (t.type === TileType.BUS_STOP && this.grid.isAdjacentToRoad(x, y)) {
+          busStops++;
+        }
+        if (t.building && !t.building.onFire && !t.building.isConstructing && t.transitCoverage > 20) {
+          coveredPop += t.building.residents;
+          coveredJobs += t.building.jobs;
+        }
+      }
+    }
+
+    this.busDepotCount = busDepots;
+    this.busStopCount = busStops;
+
+    if (busDepots > 0 && busStops > 0) {
+      let targetRidership = Math.round((coveredPop * 0.45 + coveredJobs * 0.35) * (this.fundingTransit / 100));
+      if (this.ordinances.freeTransit) {
+        targetRidership = Math.round(targetRidership * 1.5);
+      }
+      this.busRidership = Math.max(0, targetRidership);
+    } else {
+      this.busRidership = 0;
+    }
   }
 
   private processZoningAndGrowth() {
@@ -314,12 +361,15 @@ export class SimulationEngine {
     this.totalCommercialJobs = commJobs;
     this.totalIndustrialJobs = indJobs;
 
+    // Public Bus Transit & Ridership calculation
+    this.updateTransitMetrics();
+
     const taxModR = (9 - this.taxRateR) * 3;
     const taxModC = (9 - this.taxRateC) * 3;
     const taxModI = (9 - this.taxRateI) * 3;
 
-    const transitBonusR = this.ordinances.freeTransit ? 10 : 0;
-    const transitBonusC = this.ordinances.freeTransit ? 15 : 0;
+    const transitBonusR = (this.ordinances.freeTransit ? 10 : 0) + (this.busRidership > 0 ? Math.min(10, Math.floor(this.busRidership / 20)) : 0);
+    const transitBonusC = (this.ordinances.freeTransit ? 15 : 0) + (this.busRidership > 0 ? Math.min(15, Math.floor(this.busRidership / 15)) : 0);
 
     this.demandR = Math.max(-80, Math.min(100, Math.floor(30 + taxModR + transitBonusR + (this.totalJobs - this.population * 0.7) * 1.5)));
     this.demandC = Math.max(-80, Math.min(100, Math.floor(15 + taxModC + transitBonusC + (this.population * 0.35 - this.totalJobs * 0.2))));
@@ -399,6 +449,7 @@ export class SimulationEngine {
     let basePolice = 0;
     let baseHealth = 0;
     let baseEducation = 0;
+    let baseTransit = 0;
     let baseUtilities = 0;
 
     const size = this.grid.size;
@@ -415,6 +466,8 @@ export class SimulationEngine {
         else if (t.type === TileType.POLICE_STATION) basePolice += UPKEEP.POLICE_STATION;
         else if (t.type === TileType.HOSPITAL) baseHealth += UPKEEP.HOSPITAL;
         else if (t.type === TileType.SCHOOL) baseEducation += UPKEEP.SCHOOL;
+        else if (t.type === TileType.BUS_DEPOT) baseTransit += UPKEEP.BUS_DEPOT;
+        else if (t.type === TileType.BUS_STOP) baseTransit += UPKEEP.BUS_STOP;
       }
     }
 
@@ -427,6 +480,7 @@ export class SimulationEngine {
     const expensePolice = Math.round(basePolice * (this.fundingPolice / 100));
     const expenseHealth = Math.round(baseHealth * (this.fundingHealth / 100));
     const expenseEducation = Math.round(baseEducation * (this.fundingEducation / 100));
+    const expenseTransit = Math.round(baseTransit * (this.fundingTransit / 100));
     const expenseUtilities = Math.round(baseUtilities);
 
     let expenseOrdinances = 0;
@@ -436,7 +490,7 @@ export class SimulationEngine {
     if (this.ordinances.neighborhoodWatch) expenseOrdinances += ORDINANCE_COSTS.neighborhoodWatch;
     if (this.ordinances.readingCampaign) expenseOrdinances += ORDINANCE_COSTS.readingCampaign;
 
-    const totalExpenses = expenseRoads + expenseFire + expensePolice + expenseHealth + expenseEducation + expenseUtilities + expenseOrdinances;
+    const totalExpenses = expenseRoads + expenseFire + expensePolice + expenseHealth + expenseEducation + expenseTransit + expenseUtilities + expenseOrdinances;
     const netMonthly = totalRevenue - totalExpenses;
 
     return {
@@ -449,6 +503,7 @@ export class SimulationEngine {
       expensePolice,
       expenseHealth,
       expenseEducation,
+      expenseTransit,
       expenseUtilities,
       expenseOrdinances,
       totalExpenses,
@@ -496,6 +551,8 @@ export class SimulationEngine {
         fundingPolice: this.fundingPolice,
         fundingHealth: this.fundingHealth,
         fundingEducation: this.fundingEducation,
+        fundingTransit: this.fundingTransit,
+        busRidership: this.busRidership,
         weather: this.weather,
         ordinances: this.ordinances,
         month: this.month,
@@ -558,6 +615,8 @@ export class SimulationEngine {
       if (data.fundingPolice !== undefined) this.fundingPolice = data.fundingPolice;
       if (data.fundingHealth !== undefined) this.fundingHealth = data.fundingHealth;
       if (data.fundingEducation !== undefined) this.fundingEducation = data.fundingEducation;
+      if (data.fundingTransit !== undefined) this.fundingTransit = data.fundingTransit;
+      if (data.busRidership !== undefined) this.busRidership = data.busRidership;
       if (data.weather !== undefined) this.weather = data.weather;
       if (data.ordinances !== undefined) this.ordinances = { ...this.ordinances, ...data.ordinances };
 
@@ -615,6 +674,7 @@ export class SimulationEngine {
         this.fundingPolice,
         this.fundingHealth,
         this.fundingEducation,
+        this.fundingTransit,
         this.ordinances
       );
 
