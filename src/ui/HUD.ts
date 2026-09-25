@@ -1,6 +1,6 @@
 import { SimulationEngine } from '../simulation/SimulationEngine.ts';
 import { sounds } from '../core/SoundEffects.ts';
-import { OverlayMode } from '../core/Constants.ts';
+import { OverlayMode, WeatherType } from '../core/Constants.ts';
 import { BudgetModal } from './BudgetModal.ts';
 import { NewsTicker } from './NewsTicker.ts';
 import { SnapshotTool } from './SnapshotTool.ts';
@@ -22,6 +22,9 @@ export class HUD {
   private muteBtn: HTMLButtonElement;
   private popEl: HTMLElement;
   private dateEl: HTMLElement;
+  private weatherBadgeEl: HTMLElement;
+  private weatherIconEl: HTMLElement;
+  private weatherValEl: HTMLElement;
   private rciREl: HTMLElement;
   private rciCEl: HTMLElement;
   private rciIEl: HTMLElement;
@@ -45,6 +48,9 @@ export class HUD {
     this.muteBtn = document.getElementById('btn-audio-mute') as HTMLButtonElement;
     this.popEl = document.getElementById('pop-value')!;
     this.dateEl = document.getElementById('date-value')!;
+    this.weatherBadgeEl = document.getElementById('stat-weather')!;
+    this.weatherIconEl = document.getElementById('weather-icon')!;
+    this.weatherValEl = document.getElementById('weather-value')!;
     this.rciREl = document.getElementById('rci-r-fill')!;
     this.rciCEl = document.getElementById('rci-c-fill')!;
     this.rciIEl = document.getElementById('rci-i-fill')!;
@@ -156,6 +162,29 @@ export class HUD {
         }
       });
     }
+
+    // Weather Conditions Badge Click to Cycle
+    if (this.weatherBadgeEl) {
+      this.weatherBadgeEl.addEventListener('click', () => {
+        sounds.playClick();
+        const cycle = [
+          WeatherType.CLEAR,
+          WeatherType.OVERCAST,
+          WeatherType.RAIN,
+          WeatherType.THUNDERSTORM
+        ];
+        const nextIdx = (cycle.indexOf(this.engine.weather) + 1) % cycle.length;
+        this.engine.setWeather(cycle[nextIdx]);
+
+        const names: Record<WeatherType, string> = {
+          [WeatherType.CLEAR]: '☀️ Clear Skies',
+          [WeatherType.OVERCAST]: '☁️ Overcast',
+          [WeatherType.RAIN]: '🌧️ Rain Showers',
+          [WeatherType.THUNDERSTORM]: '⛈️ Severe Thunderstorm'
+        };
+        this.showToast(`Weather changed to ${names[this.engine.weather]}`);
+      });
+    }
   }
 
   private setupKeyboardShortcuts() {
@@ -242,6 +271,31 @@ export class HUD {
 
     this.popEl.textContent = this.engine.population.toLocaleString();
     this.dateEl.textContent = this.engine.getDateString();
+
+    if (this.weatherIconEl && this.weatherValEl) {
+      switch (this.engine.weather) {
+        case WeatherType.CLEAR:
+          this.weatherIconEl.textContent = '☀️';
+          this.weatherValEl.textContent = 'Clear';
+          this.weatherBadgeEl.style.color = '#facc15';
+          break;
+        case WeatherType.OVERCAST:
+          this.weatherIconEl.textContent = '☁️';
+          this.weatherValEl.textContent = 'Overcast';
+          this.weatherBadgeEl.style.color = '#94a3b8';
+          break;
+        case WeatherType.RAIN:
+          this.weatherIconEl.textContent = '🌧️';
+          this.weatherValEl.textContent = 'Rain';
+          this.weatherBadgeEl.style.color = '#60a5fa';
+          break;
+        case WeatherType.THUNDERSTORM:
+          this.weatherIconEl.textContent = '⛈️';
+          this.weatherValEl.textContent = 'Storm';
+          this.weatherBadgeEl.style.color = '#c084fc';
+          break;
+      }
+    }
 
     const mapDemand = (d: number) => `${Math.max(10, Math.min(100, (d + 100) / 2))}%`;
     this.rciREl.style.height = mapDemand(this.engine.demandR);

@@ -1,3 +1,5 @@
+import { WeatherType } from './Constants.ts';
+
 /**
  * Web Audio API synthesizer for retro 16-bit sound effects and dynamic procedural soundscape.
  */
@@ -11,11 +13,13 @@ class SoundManager {
   private breezeGain: GainNode | null = null;
   private trafficGain: GainNode | null = null;
   private industryGain: GainNode | null = null;
+  private rainGain: GainNode | null = null;
 
   // Last event timestamps for procedural ambiance
   private lastHornTime: number = 0;
   private lastCricketTime: number = 0;
   private lastSirenTime: number = 0;
+  private lastThunderTime: number = 0;
 
   constructor() {
     // Check saved mute state from LocalStorage
@@ -305,6 +309,40 @@ class SoundManager {
     osc.stop(t + 0.09);
   }
 
+  // Thunderstorm clap & rumble
+  public playThunder() {
+    if (this.isMuted) return;
+    this.initCtx();
+    if (!this.ctx || !this.masterGain) return;
+
+    const t = this.ctx.currentTime;
+    const bufferSize = Math.floor(this.ctx.sampleRate * 2.2);
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(320, t);
+    filter.frequency.exponentialRampToValueAtTime(65, t + 2.0);
+
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.01, t);
+    gain.gain.linearRampToValueAtTime(0.25, t + 0.08); // sharp crack
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 2.2);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.masterGain);
+
+    noise.start(t);
+  }
+
   // --- DYNAMIC AMBIENT SOUNDSCAPE ENGINE ---
 
   public startAmbientLoop() {
@@ -367,12 +405,30 @@ class SoundManager {
     indOsc.connect(this.industryGain);
     this.industryGain.connect(this.masterGain);
     indOsc.start();
+
+    // 4. Rain Loop (patter/hiss)
+    const rainSource = this.ctx.createBufferSource();
+    rainSource.buffer = breezeBuffer;
+    rainSource.loop = true;
+
+    const rainFilter = this.ctx.createBiquadFilter();
+    rainFilter.type = 'bandpass';
+    rainFilter.frequency.setValueAtTime(1300, this.ctx.currentTime);
+    rainFilter.Q.setValueAtTime(0.7, this.ctx.currentTime);
+
+    this.rainGain = this.ctx.createGain();
+    this.rainGain.gain.setValueAtTime(0, this.ctx.currentTime);
+
+    rainSource.connect(rainFilter);
+    rainFilter.connect(this.rainGain);
+    this.rainGain.connect(this.masterGain);
+    rainSource.start();
   }
 
   /**
-   * Updates ambient volumes based on real-time city state and time of day.
+   * Updates ambient volumes based on real-time city state, weather, and time of day.
    */
-  public updateAmbient(population: number, industrialJobs: number, gameHour: number, activeFires: number) {
+  public updateAmbient(population: number, industrialJobs: number, gameHour: number, activeFires: number, weather: WeatherType = WeatherType.CLEAR) {
     if (!this.ambientStarted || !this.ctx) return;
     const now = this.ctx.currentTime;
 
@@ -394,6 +450,19 @@ class SoundManager {
       this.breezeGain.gain.linearRampToValueAtTime(targetBreeze, now + 1.0);
     }
 
+    // Rain soundscape volume
+    const isRaining = weather === WeatherType.RAIN || weather === WeatherType.THUNDERSTORM;
+    const targetRain = isRaining ? (weather === WeatherType.THUNDERSTORM ? 0.035 : 0.02) : 0;
+    if (this.rainGain) {
+      this.rainGain.gain.linearRampToValueAtTime(targetRain, now + 1.2);
+    }
+
+    // Procedural Thunder during thunderstorms (every ~10-18 seconds)
+    if (weather === WeatherType.THUNDERSTORM && now - this.lastThunderTime > 12 && Math.random() < 0.35) {
+      this.lastThunderTime = now;
+      this.playThunder();
+    }
+
     // Procedural Car Horn in populated cities (every ~12-18 seconds)
     if (population >= 40 && now - this.lastHornTime > 14 && Math.random() < 0.25) {
       this.lastHornTime = now;
@@ -406,9 +475,9 @@ class SoundManager {
       this.playSiren();
     }
 
-    // Procedural Crickets at night (hours 21:00 to 05:00)
+    // Procedural Crickets at night when not raining (hours 21:00 to 05:00)
     const isNight = gameHour >= 21 || gameHour <= 5;
-    if (isNight && now - this.lastCricketTime > 8 && Math.random() < 0.35) {
+    if (isNight && !isRaining && now - this.lastCricketTime > 8 && Math.random() < 0.35) {
       this.lastCricketTime = now;
       this.playNightCricket();
     }

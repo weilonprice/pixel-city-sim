@@ -90,6 +90,17 @@
       color: #f472b6;
     }
 
+    .stat-badge.weather {
+      color: #facc15;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .stat-badge.weather:hover {
+      background: #232336;
+      border-color: #facc15;
+    }
+
     /* RCI METERS */
     .rci-container {
       display: flex;
@@ -530,12 +541,133 @@
       color: #fff;
     }
 
+    .budget-tabs {
+      display: flex;
+      gap: 6px;
+    }
+
+    .budget-tab-btn {
+      background: #2a2a3b;
+      border: 1px solid #47475f;
+      color: #94a3b8;
+      font-family: inherit;
+      font-size: 9px;
+      padding: 5px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .budget-tab-btn:hover {
+      background: #36364c;
+      color: #fff;
+    }
+
+    .budget-tab-btn.active {
+      background: #4f46e5;
+      border-color: #818cf8;
+      color: #fff;
+      font-weight: bold;
+    }
+
     .budget-body {
+      padding: 16px;
+      background: #14141d;
+    }
+
+    .tab-pane {
+      display: block;
+    }
+
+    .tab-pane.hidden {
+      display: none !important;
+    }
+
+    .budget-grid-columns {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 16px;
-      padding: 16px;
-      background: #14141d;
+    }
+
+    .ordinances-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 400px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .ordinance-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #1b1b28;
+      border: 2px solid #2e2e42;
+      border-radius: 4px;
+      padding: 12px 14px;
+      gap: 14px;
+      transition: border-color 0.15s ease;
+    }
+
+    .ordinance-card:hover {
+      border-color: #4f46e5;
+    }
+
+    .ord-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+    }
+
+    .ord-title {
+      font-size: 10px;
+      color: #f1f5f9;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .ord-cost {
+      font-family: 'VT323', monospace;
+      font-size: 16px;
+      color: #f87171;
+    }
+
+    .ord-desc {
+      font-size: 8px;
+      color: #94a3b8;
+      line-height: 1.4;
+    }
+
+    .ord-toggle-btn {
+      font-family: inherit;
+      font-size: 10px;
+      font-weight: bold;
+      min-width: 54px;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      background: #2b2b3d;
+      border: 2px solid #4a4a63;
+      color: #94a3b8;
+      transition: all 0.15s ease;
+      text-align: center;
+    }
+
+    .ord-toggle-btn:hover {
+      background: #38384f;
+      border-color: #64748b;
+      color: #fff;
+    }
+
+    .ord-toggle-btn.active {
+      background: #15803d;
+      border-color: #4ade80;
+      color: #fff;
+      box-shadow: 0 0 8px rgba(74, 222, 128, 0.4);
     }
 
     .budget-column {
@@ -783,6 +915,11 @@
       <div class="stat-badge date" id="stat-date">
         <span>📅</span>
         <span id="date-value">Jan 2000 • 12:00</span>
+      </div>
+
+      <div class="stat-badge weather" id="stat-weather" title="Current Weather - Click to cycle conditions">
+        <span id="weather-icon">☀️</span>
+        <span id="weather-value">Clear</span>
       </div>
 
       <!-- RCI Demand -->

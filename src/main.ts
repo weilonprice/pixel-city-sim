@@ -457,7 +457,7 @@ window.addEventListener('DOMContentLoaded', () => {
         if (grid.tiles[x][y].building?.onFire) activeFires++;
       }
     }
-    sounds.updateAmbient(engine.population, engine.totalIndustrialJobs, engine.gameHour, activeFires);
+    sounds.updateAmbient(engine.population, engine.totalIndustrialJobs, engine.gameHour, activeFires, engine.weather);
   }, 1000);
 
   // Auto-Save every 60 seconds

@@ -305,14 +305,95 @@ async function runPlaytest() {
   if (resetTaxR !== '9%') throw new Error(`Budget reset failed! Expected 9%, got ${resetTaxR}`);
   console.log('   ✅ Reset button restored neutral 9% tax rates and 100% funding.');
 
+  // 8.5 Test City Ordinances & Municipal Policies Tab
+  console.log('\n8.5 Testing City Ordinances & Municipal Policies...');
+  // Switch to Ordinances tab
+  await page.click('#tab-btn-ordinances');
+  await sleep(200);
+
+  const isOrdinanceTabVisible = await page.$eval('#tab-content-ordinances', el => !el.classList.contains('hidden'));
+  if (!isOrdinanceTabVisible) throw new Error('Ordinance tab failed to display!');
+
+  // Toggle on all 5 ordinances
+  const ordToggles = [
+    '#ord-toggle-smoke',
+    '#ord-toggle-transit',
+    '#ord-toggle-clean',
+    '#ord-toggle-watch',
+    '#ord-toggle-reading'
+  ];
+
+  for (const toggleId of ordToggles) {
+    await page.click(toggleId);
+    await sleep(100);
+    const txt = await page.$eval(toggleId, el => el.textContent);
+    const isActive = await page.$eval(toggleId, el => el.classList.contains('active'));
+    if (txt !== 'ON' || !isActive) {
+      throw new Error(`Ordinance toggle ${toggleId} failed to turn ON!`);
+    }
+  }
+
+  // Verify ordinances state in SimulationEngine
+  const ordinanceStatus = await page.evaluate(`(() => {
+    const engine = window.game.engine;
+    const ledger = engine.getFinancialLedger();
+    return {
+      ordinances: engine.ordinances,
+      expenseOrdinances: ledger.expenseOrdinances
+    };
+  })()`) as { ordinances: Record<string, boolean>; expenseOrdinances: number };
+
+  console.log(`   Active Ordinances Cost: -$${ordinanceStatus.expenseOrdinances}/mo (Expected: $175)`);
+  if (ordinanceStatus.expenseOrdinances !== 175) {
+    throw new Error(`Ordinances expense mismatch! Expected 175, got ${ordinanceStatus.expenseOrdinances}`);
+  }
+
+  // Switch back to Taxes tab and verify the line item shows in the expense list
+  await page.click('#tab-btn-taxes');
+  await sleep(200);
+  const ordCostInLedger = await page.$eval('#fund-ord-cost', el => el.textContent);
+  console.log(`   Ledger line item: Active City Ordinances = ${ordCostInLedger}`);
+  if (ordCostInLedger !== '-$175/mo') {
+    throw new Error(`Ledger did not display ordinances expense! Expected -$175/mo, got ${ordCostInLedger}`);
+  }
+  console.log('   ✅ City Ordinances toggles, tab switching, and cost deductions verified.');
+
   // Close modal via Done button
   await page.click('#budget-btn-apply');
   await sleep(200);
 
-  // 9. Test Save and Load Persistence (including Budget & Tax rates)
-  await page.click('#btn-pause'); // Pause simulation for deterministic save snapshot
+  // 9. Test Dynamic Weather System
+  console.log('\n9. Testing Dynamic Weather System & Atmosphere...');
+  await page.click('#btn-pause'); // Pause simulation for deterministic weather testing
+  await sleep(100);
+  const weatherInitial = await page.$eval('#weather-value', el => el.textContent);
+  console.log(`   Initial Weather: ${weatherInitial}`);
+
+  // Test cycling through all 4 weather states via clicking #stat-weather
+  const expectedCycle = ['Overcast', 'Rain', 'Storm', 'Clear'];
+  for (const expectedName of expectedCycle) {
+    await page.click('#stat-weather');
+    await sleep(200);
+    const currentName = await page.$eval('#weather-value', el => el.textContent);
+    console.log(`   Cycled Weather: ${currentName} (Expected: ${expectedName})`);
+    if (currentName !== expectedName) {
+      throw new Error(`Weather cycling failed! Expected ${expectedName}, got ${currentName}`);
+    }
+  }
+
+  // Programmatically test Thunderstorm with lighting and rain drops
+  console.log('   Testing Thunderstorm lightning and atmospheric rendering...');
+  await page.evaluate(`(() => {
+    window.game.engine.setWeather('THUNDERSTORM');
+  })()`);
+  await sleep(500);
+  const stormVal = await page.$eval('#weather-value', el => el.textContent);
+  if (stormVal !== 'Storm') throw new Error(`Failed to activate Thunderstorm, got ${stormVal}`);
+  console.log('   ✅ Dynamic Weather System cycling & thunderstorm atmosphere verified.');
+
+  // 10. Test Save and Load Persistence (including Budget, Ordinances & Weather)
   const popBeforeSave = await page.$eval('#pop-value', el => el.textContent);
-  console.log(`\n9. Testing LocalStorage Save & Load (Population at Save: ${popBeforeSave})...`);
+  console.log(`\n10. Testing LocalStorage Save & Load (Population at Save: ${popBeforeSave})...`);
   
   // Set custom tax rate before save
   await page.evaluate(`(() => {
@@ -336,20 +417,39 @@ async function runPlaytest() {
     throw new Error(`Save/Load mismatch! Expected ${popBeforeSave}, got ${restoredPop}`);
   }
 
-  const restoredRates = await page.evaluate(`(() => {
+  const restoredState = await page.evaluate(`(() => {
+    const e = window.game.engine;
     return {
-      taxRateR: window.game.engine.taxRateR,
-      fundingFire: window.game.engine.fundingFire
+      taxRateR: e.taxRateR,
+      fundingFire: e.fundingFire,
+      weather: e.weather,
+      smokeDetectors: e.ordinances.smokeDetectors,
+      freeTransit: e.ordinances.freeTransit
     };
-  })()`) as { taxRateR: number; fundingFire: number };
-  console.log(`   Restored Tax Rate R: ${restoredRates.taxRateR}%, Fire Funding: ${restoredRates.fundingFire}%`);
-  if (restoredRates.taxRateR !== 7 || restoredRates.fundingFire !== 125) {
+  })()`) as { taxRateR: number; fundingFire: number; weather: string; smokeDetectors: boolean; freeTransit: boolean };
+
+  console.log(`   Restored Tax Rate R: ${restoredState.taxRateR}%, Fire Funding: ${restoredState.fundingFire}%`);
+  console.log(`   Restored Weather: ${restoredState.weather}`);
+  console.log(`   Restored Ordinances: smokeDetectors=${restoredState.smokeDetectors}, freeTransit=${restoredState.freeTransit}`);
+
+  if (restoredState.taxRateR !== 7 || restoredState.fundingFire !== 125) {
     throw new Error('Save/load failed to restore budget tax/funding rates!');
   }
-  console.log('   ✅ Save & Load verified with exact state & budget restoration.');
+  if (restoredState.weather !== 'THUNDERSTORM') {
+    throw new Error(`Save/load failed to restore weather! Expected THUNDERSTORM, got ${restoredState.weather}`);
+  }
+  if (!restoredState.smokeDetectors || !restoredState.freeTransit) {
+    throw new Error('Save/load failed to restore active municipal ordinances!');
+  }
 
-  // 10. Test Ambient Audio & Mute Controls
-  console.log('\n10. Testing Audio Mute Controls & Ambient Soundscape...');
+  const restoredWeatherBadge = await page.$eval('#weather-value', el => el.textContent);
+  if (restoredWeatherBadge !== 'Storm') {
+    throw new Error(`Weather badge UI not updated after load! Expected Storm, got ${restoredWeatherBadge}`);
+  }
+  console.log('   ✅ Save & Load verified with exact state, budget, weather & ordinances restoration.');
+
+  // 11. Test Ambient Audio & Mute Controls
+  console.log('\n11. Testing Audio Mute Controls & Ambient Soundscape...');
   const initialMuteIcon = await page.$eval('#btn-audio-mute', el => el.textContent);
   if (initialMuteIcon !== '🔊') throw new Error(`Expected initial audio icon 🔊, got ${initialMuteIcon}`);
 
@@ -366,8 +466,8 @@ async function runPlaytest() {
   if (unmutedIcon !== '🔊') throw new Error(`Expected unmuted icon 🔊 after M key, got ${unmutedIcon}`);
   console.log('   ✅ Audio mute controls verified via UI button and "M" shortcut.');
 
-  // 11. Test City Snapshot & Photo Tool
-  console.log('\n11. Testing City Snapshot Photo Tool...');
+  // 12. Test City Snapshot & Photo Tool
+  console.log('\n12. Testing City Snapshot Photo Tool...');
   await page.click('#btn-snapshot');
   await sleep(300);
   console.log('   ✅ Snapshot photo trigger executed with camera flash effect.');
