@@ -34,7 +34,7 @@ async function runPlaytest() {
   });
 
   const page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 800 });
+  await page.setViewport({ width: 1440, height: 900 });
 
   const errors: string[] = [];
   page.on('console', msg => {
@@ -57,19 +57,25 @@ async function runPlaytest() {
 
   // 2. Test All Toolbar Buttons
   console.log('\n2. Testing Toolbar buttons clickability...');
-  const tools = ['dirt-road', 'road', 'avenue', 'zone-r', 'zone-c', 'zone-i', 'power-plant', 'water-pump', 'fire-station', 'police-station', 'hospital', 'school', 'park', 'bus-depot', 'bus-stop', 'demolish', 'inspect'];
+  const tools = ['dirt-road', 'road', 'avenue', 'zone-r', 'zone-c', 'zone-i', 'power-plant', 'water-pump', 'fire-station', 'police-station', 'hospital', 'school', 'park', 'bus-depot', 'bus-stop', 'train-station', 'train-track', 'demolish', 'inspect'];
   for (const tool of tools) {
-    await page.click(`button[data-tool="${tool}"]`);
+    const btn = await page.$(`button[data-tool="${tool}"]`);
+    if (!btn) throw new Error(`Button for ${tool} not found`);
+    await btn.evaluate(el => el.scrollIntoView({ block: 'nearest', inline: 'nearest' }));
+    await btn.click();
     const activeTool = await page.$eval('.tool-btn.active', el => el.getAttribute('data-tool'));
     if (activeTool !== tool) throw new Error(`Tool ${tool} failed to activate`);
   }
-  console.log('   ✅ All 17 standard toolbar buttons respond and toggle properly.');
+  console.log('   ✅ All 19 standard toolbar buttons respond and toggle properly.');
 
   // 2b. Test Locked Reward Buildings — they should NOT activate before milestones
   console.log('   Testing locked reward building buttons...');
   const lockedRewardTools = ['mayors-mansion', 'city-hall', 'grand-central'];
   for (const tool of lockedRewardTools) {
-    await page.click(`button[data-tool="${tool}"]`);
+    const btn = await page.$(`button[data-tool="${tool}"]`);
+    if (!btn) throw new Error(`Reward tool ${tool} not found`);
+    await btn.evaluate(el => el.scrollIntoView({ block: 'nearest', inline: 'nearest' }));
+    await btn.click();
     const isLocked = await page.$eval(`button[data-tool="${tool}"]`, el => el.classList.contains('locked'));
     if (!isLocked) throw new Error(`Reward tool ${tool} should be locked at game start!`);
   }
@@ -173,6 +179,14 @@ async function runPlaytest() {
       game.applyTool(x, 22);
     }
 
+    // H. Build Heavy Railroad Corridor & Passenger Station
+    game.hud.activeTool = 'train-station';
+    game.applyTool(21, 24);
+    game.hud.activeTool = 'train-track';
+    for (let y = 23; y <= 27; y++) {
+      game.applyTool(22, y);
+    }
+
     // Center camera on newly laid town
     game.camera.centerOnTile(30, 23, 1280, 700);
     game.camera.zoom = 1.35;
@@ -185,6 +199,8 @@ async function runPlaytest() {
     const pavedRoadTile = game.grid.getTile(30, 20);
     const depotTile = game.grid.getTile(29, 23);
     const stopTile = game.grid.getTile(27, 21);
+    const stationTile = game.grid.getTile(21, 24);
+    const trackTile = game.grid.getTile(22, 25);
 
     return {
       success: true,
@@ -196,8 +212,11 @@ async function runPlaytest() {
       dirtConnected: dirtRoadTile ? dirtRoadTile.connectedToHighway : false,
       depotType: depotTile ? depotTile.type : null,
       stopType: stopTile ? stopTile.type : null,
+      stationType: stationTile ? stationTile.type : null,
+      trackType: trackTile ? trackTile.type : null,
       busDepotCount: game.engine.busDepotCount,
       busStopCount: game.engine.busStopCount,
+      trainStationCount: game.engine.trainStationCount,
       stopTransitCoverage: stopTile ? stopTile.transitCoverage : 0
     };
   })()`;
@@ -212,13 +231,17 @@ async function runPlaytest() {
     dirtConnected: boolean;
     depotType: string;
     stopType: string;
+    stationType: string;
+    trackType: string;
     busDepotCount: number;
     busStopCount: number;
+    trainStationCount: number;
     stopTransitCoverage: number;
   };
   console.log(`   ✅ Construction completed. Remaining funds: $${constructTownResult.fundsAfterBuild.toLocaleString()}`);
   console.log(`   Road Hierarchy Verified: Avenue=${constructTownResult.avenueType} (Hwy:${constructTownResult.avenueConnected ? '✅' : '❌'}), Dirt=${constructTownResult.dirtRoadType} (Hwy:${constructTownResult.dirtConnected ? '✅' : '❌'}), Paved=${constructTownResult.pavedRoadType}`);
   console.log(`   Transit Network Verified: Depot=${constructTownResult.depotType} (${constructTownResult.busDepotCount} Depots), Stops=${constructTownResult.stopType} (${constructTownResult.busStopCount} Stops, Stop Cov: ${constructTownResult.stopTransitCoverage}%)`);
+  console.log(`   Heavy Rail Network Verified: Station=${constructTownResult.stationType} (${constructTownResult.trainStationCount} Stations), Track=${constructTownResult.trackType}`);
 
   if (constructTownResult.avenueType !== 'AVENUE') throw new Error(`Expected AVENUE type, got ${constructTownResult.avenueType}`);
   if (constructTownResult.dirtRoadType !== 'DIRT_ROAD') throw new Error(`Expected DIRT_ROAD type, got ${constructTownResult.dirtRoadType}`);
@@ -227,6 +250,9 @@ async function runPlaytest() {
   if (constructTownResult.depotType !== 'BUS_DEPOT') throw new Error(`Expected BUS_DEPOT, got ${constructTownResult.depotType}`);
   if (constructTownResult.stopType !== 'BUS_STOP') throw new Error(`Expected BUS_STOP, got ${constructTownResult.stopType}`);
   if (constructTownResult.busDepotCount < 1 || constructTownResult.busStopCount < 2) throw new Error('Transit depots or stops not counted in engine!');
+  if (constructTownResult.stationType !== 'TRAIN_STATION') throw new Error(`Expected TRAIN_STATION, got ${constructTownResult.stationType}`);
+  if (constructTownResult.trackType !== 'TRAIN_TRACK') throw new Error(`Expected TRAIN_TRACK, got ${constructTownResult.trackType}`);
+  if (constructTownResult.trainStationCount < 1) throw new Error('Train station not counted in engine!');
 
   // Take screenshot immediately after layout
   await page.screenshot({ path: path.join(projectRoot, 'playtest_step1_layout.png') });
@@ -236,7 +262,7 @@ async function runPlaytest() {
   await page.click('#btn-speed-3');
 
   // Wait and monitor simulation progress until population flourishes
-  let finalStats = { pop: 0, jobs: 0, funds: 0, ridership: 0, buses: 0 };
+  let finalStats = { pop: 0, jobs: 0, funds: 0, ridership: 0, buses: 0, trains: 0, trainRidership: 0 };
   for (let i = 1; i <= 6; i++) {
     await sleep(3000);
     finalStats = await page.evaluate(`(() => {
@@ -246,10 +272,12 @@ async function runPlaytest() {
         jobs: g.engine.totalJobs,
         funds: g.engine.funds,
         ridership: g.engine.busRidership,
-        buses: g.renderer && g.renderer.vehicles ? g.renderer.vehicles.filter(v => v.isBus).length : 0
+        buses: g.renderer && g.renderer.vehicles ? g.renderer.vehicles.filter(v => v.isBus).length : 0,
+        trains: g.renderer && g.renderer.vehicles ? g.renderer.vehicles.filter(v => v.isTrain).length : 0,
+        trainRidership: g.engine.trainRidership
       };
-    })()`) as { pop: number; jobs: number; funds: number; ridership: number; buses: number };
-    console.log(`   [Sim Check ${i} (+${i * 3}s)] Pop: ${finalStats.pop} | Jobs: ${finalStats.jobs} | Transit Riders: ${finalStats.ridership} | City Buses: ${finalStats.buses} | Funds: $${finalStats.funds.toLocaleString()}`);
+    })()`) as { pop: number; jobs: number; funds: number; ridership: number; buses: number; trains: number; trainRidership: number };
+    console.log(`   [Sim Check ${i} (+${i * 3}s)] Pop: ${finalStats.pop} | Jobs: ${finalStats.jobs} | Bus Riders: ${finalStats.ridership} | Train Riders: ${finalStats.trainRidership} | Buses: ${finalStats.buses} | Trains: ${finalStats.trains} | Funds: $${finalStats.funds.toLocaleString()}`);
     if (finalStats.pop > 0 && finalStats.jobs > 0 && i >= 3) {
       break;
     }
@@ -587,10 +615,14 @@ async function runPlaytest() {
       pavedRoadType: g.grid.getTile(30, 20)?.type,
       depotType: g.grid.getTile(29, 23)?.type,
       stopType: g.grid.getTile(27, 21)?.type,
+      stationType: g.grid.getTile(21, 24)?.type,
+      trackType: g.grid.getTile(22, 25)?.type,
       depotCount: g.engine.busDepotCount,
-      stopCount: g.engine.busStopCount
+      stopCount: g.engine.busStopCount,
+      stationCount: g.engine.trainStationCount,
+      trainRidership: g.engine.trainRidership
     };
-  })()`) as { avenueType: string; dirtRoadType: string; pavedRoadType: string; depotType: string; stopType: string; depotCount: number; stopCount: number };
+  })()`) as { avenueType: string; dirtRoadType: string; pavedRoadType: string; depotType: string; stopType: string; stationType: string; trackType: string; depotCount: number; stopCount: number; stationCount: number; trainRidership: number };
 
   if (restoredRoadAndTransitTypes.avenueType !== 'AVENUE' || restoredRoadAndTransitTypes.dirtRoadType !== 'DIRT_ROAD' || restoredRoadAndTransitTypes.pavedRoadType !== 'ROAD') {
     throw new Error(`Road hierarchy failed to persist! Got: ave=${restoredRoadAndTransitTypes.avenueType}, dirt=${restoredRoadAndTransitTypes.dirtRoadType}, road=${restoredRoadAndTransitTypes.pavedRoadType}`);
@@ -598,9 +630,13 @@ async function runPlaytest() {
   if (restoredRoadAndTransitTypes.depotType !== 'BUS_DEPOT' || restoredRoadAndTransitTypes.stopType !== 'BUS_STOP') {
     throw new Error(`Transit structures failed to persist! Got: depot=${restoredRoadAndTransitTypes.depotType}, stop=${restoredRoadAndTransitTypes.stopType}`);
   }
+  if (restoredRoadAndTransitTypes.stationType !== 'TRAIN_STATION' || restoredRoadAndTransitTypes.trackType !== 'TRAIN_TRACK') {
+    throw new Error(`Heavy rail structures failed to persist! Got: station=${restoredRoadAndTransitTypes.stationType}, track=${restoredRoadAndTransitTypes.trackType}`);
+  }
 
   console.log(`   Restored Road Hierarchy: Avenue=${restoredRoadAndTransitTypes.avenueType}, Dirt Road=${restoredRoadAndTransitTypes.dirtRoadType}, Paved Road=${restoredRoadAndTransitTypes.pavedRoadType}`);
   console.log(`   Restored Transit Network: Depot=${restoredRoadAndTransitTypes.depotType} (${restoredRoadAndTransitTypes.depotCount}), Stop=${restoredRoadAndTransitTypes.stopType} (${restoredRoadAndTransitTypes.stopCount})`);
+  console.log(`   Restored Heavy Rail: Station=${restoredRoadAndTransitTypes.stationType} (${restoredRoadAndTransitTypes.stationCount}), Track=${restoredRoadAndTransitTypes.trackType}`);
 
   // Verify milestone persistence
   const restoredMilestones = await page.evaluate(`(() => {

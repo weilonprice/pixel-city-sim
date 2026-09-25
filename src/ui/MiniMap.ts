@@ -105,6 +105,10 @@ export class MiniMap {
           color = '#fbbf24'; // City Hall Marble Gold
         } else if (t.type === TileType.GRAND_CENTRAL) {
           color = '#a855f7'; // Grand Central Purple
+        } else if (t.type === TileType.TRAIN_STATION) {
+          color = '#ea580c'; // Train Station Warm Amber/Orange
+        } else if (t.type === TileType.TRAIN_TRACK) {
+          color = '#71717a'; // Steel Track Gray
         } else if (
           t.type === TileType.FIRE_STATION ||
           t.type === TileType.POLICE_STATION ||

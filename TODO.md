@@ -48,7 +48,9 @@ A prioritized development roadmap and feature checklist for expanding **Pixel Ci
   - [x] Radial transit coverage network (~8 tiles, scaled by funding & Free Transit ordinance).
   - [x] Procedural city transit buses with boarding badges and pneumatic air brake SFX.
   - [x] Transit data heatmap overlay, budget departmental funding slider, and dynamic news bulletins.
-  - [ ] Heavy Rail / Train tracks and passenger/freight train stations.
+  - [x] Heavy Rail / Train tracks ($15/tile), steel trestle bridges ($45/tile), and passenger train stations ($750).
+    - [x] Passenger train locomotives & coaches cruising track networks with animated steam puffs and brass horn SFX.
+    - [x] Train station radius coverage (14 tiles), +30 land value boost, train ridership demand bonus, and full save/load persistence.
   - [ ] Underground Subway / Metro layer with tunnels and stations.
 
 ---
@@ -65,6 +67,13 @@ A prioritized development roadmap and feature checklist for expanding **Pixel Ci
   - [x] Clean Air & Smog Scrubbers (cuts power plant pollution spread by 40%).
   - [x] Neighborhood Watch Patrols (cuts residential petty crime by 35%).
   - [x] Pro-Reading Literacy Campaign (boosts school education coverage radius by 25%).
+- [x] **City Milestones & Reward Buildings**
+  - [x] 5-tier milestone progression: Settlement → Village → Town → City → Metropolis.
+  - [x] Mayor's Mansion (Village, 100 pop): +25 land value radial boost.
+  - [x] City Hall (Town, 500 pop): 10% expense discount, +35 land value, +60 police coverage.
+  - [x] Grand Central (City, 1500 pop): +100 transit, +40 land value boost.
+  - [x] Milestone modal with celebration banner, tier cards, progress bars.
+  - [x] Full save/load persistence for milestones.
 
 ---
 
