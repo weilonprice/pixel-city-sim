@@ -1,4 +1,4 @@
-import { TileType, ZoneType, Tile, BuildingData, UPKEEP, OverlayMode, WeatherType, CityOrdinances, ORDINANCE_COSTS, isAnyRoad } from '../core/Constants.ts';
+import { TileType, ZoneType, Tile, BuildingData, UPKEEP, OverlayMode, WeatherType, CityOrdinances, ORDINANCE_COSTS, isAnyRoad, CITY_MILESTONES, CityMilestone } from '../core/Constants.ts';
 import { Grid } from './Grid.ts';
 import { sounds } from '../core/SoundEffects.ts';
 
@@ -16,6 +16,8 @@ export interface FinancialLedger {
   expenseTransit: number;
   expenseUtilities: number;
   expenseOrdinances: number;
+  expenseCivicRewards: number;
+  cityHallDiscount: number;
   totalExpenses: number;
 
   netMonthly: number;
@@ -32,6 +34,13 @@ export class SimulationEngine {
   public busRidership: number = 0;
   public busStopCount: number = 0;
   public busDepotCount: number = 0;
+
+  // City Milestones & Reward Buildings
+  public unlockedMilestones: string[] = ['settlement'];
+  public hasMayorsMansion: boolean = false;
+  public hasCityHall: boolean = false;
+  public hasGrandCentral: boolean = false;
+  public onMilestoneReached?: (milestone: CityMilestone) => void;
 
   // RCI Demands (-100 to +100)
   public demandR: number = 60;
@@ -138,8 +147,10 @@ export class SimulationEngine {
         this.ordinances
       );
 
-      // 3. Update Public Transit metrics
+      // 3. Update Public Transit & Civic Reward metrics
       this.updateTransitMetrics();
+      this.updateRewardMetrics();
+      this.checkMilestones();
 
       // 4. Process Building Growth & Fire Emergencies (every 5 ticks)
       if (this.tickCount % 5 === 0) {
@@ -201,7 +212,7 @@ export class SimulationEngine {
 
       for (const n of neighbors) {
         const t = n.tile;
-        if (!t.powered && (isAnyRoad(t.type) || t.type === TileType.PARK || t.type === TileType.POWER_PLANT || t.type === TileType.WATER_PUMP || t.type === TileType.FIRE_STATION || t.type === TileType.POLICE_STATION || t.type === TileType.HOSPITAL || t.type === TileType.SCHOOL || t.type === TileType.BUS_DEPOT || t.type === TileType.BUS_STOP || t.building)) {
+        if (!t.powered && (isAnyRoad(t.type) || t.type === TileType.PARK || t.type === TileType.POWER_PLANT || t.type === TileType.WATER_PUMP || t.type === TileType.FIRE_STATION || t.type === TileType.POLICE_STATION || t.type === TileType.HOSPITAL || t.type === TileType.SCHOOL || t.type === TileType.BUS_DEPOT || t.type === TileType.BUS_STOP || t.type === TileType.MAYORS_MANSION || t.type === TileType.CITY_HALL || t.type === TileType.GRAND_CENTRAL || t.building)) {
           t.powered = true;
           if (t.building) t.building.powered = true;
           powerQueue.push(t);
@@ -215,7 +226,7 @@ export class SimulationEngine {
 
       for (const n of neighbors) {
         const t = n.tile;
-        if (!t.watered && (isAnyRoad(t.type) || t.type === TileType.PARK || t.type === TileType.WATER_PUMP || t.type === TileType.FIRE_STATION || t.type === TileType.POLICE_STATION || t.type === TileType.HOSPITAL || t.type === TileType.SCHOOL || t.type === TileType.BUS_DEPOT || t.type === TileType.BUS_STOP || t.building)) {
+        if (!t.watered && (isAnyRoad(t.type) || t.type === TileType.PARK || t.type === TileType.WATER_PUMP || t.type === TileType.FIRE_STATION || t.type === TileType.POLICE_STATION || t.type === TileType.HOSPITAL || t.type === TileType.SCHOOL || t.type === TileType.BUS_DEPOT || t.type === TileType.BUS_STOP || t.type === TileType.MAYORS_MANSION || t.type === TileType.CITY_HALL || t.type === TileType.GRAND_CENTRAL || t.building)) {
           t.watered = true;
           if (t.building) t.building.watered = true;
           waterQueue.push(t);
@@ -259,6 +270,42 @@ export class SimulationEngine {
       this.busRidership = Math.max(0, targetRidership);
     } else {
       this.busRidership = 0;
+    }
+  }
+
+  public updateRewardMetrics() {
+    const size = this.grid.size;
+    let mayorsMansion = false;
+    let cityHall = false;
+    let grandCentral = false;
+
+    for (let x = 0; x < size; x++) {
+      for (let y = 0; y < size; y++) {
+        const t = this.grid.tiles[x][y];
+        if (t.type === TileType.MAYORS_MANSION && t.powered && t.watered) mayorsMansion = true;
+        else if (t.type === TileType.CITY_HALL && t.powered && t.watered) cityHall = true;
+        else if (t.type === TileType.GRAND_CENTRAL && t.powered && t.watered) grandCentral = true;
+      }
+    }
+
+    this.hasMayorsMansion = mayorsMansion;
+    this.hasCityHall = cityHall;
+    this.hasGrandCentral = grandCentral;
+  }
+
+  public checkMilestones() {
+    for (const milestone of CITY_MILESTONES) {
+      if (this.population >= milestone.minPop && !this.unlockedMilestones.includes(milestone.id)) {
+        this.unlockedMilestones.push(milestone.id);
+        sounds.playMilestoneFanfare();
+        sounds.playCivicCheer();
+        if (this.onMilestoneReached) {
+          this.onMilestoneReached(milestone);
+        }
+        if (this.onNotification) {
+          this.onNotification(`🎉 MILESTONE: Reached ${milestone.name}! Unlocked: ${milestone.rewardName}`);
+        }
+      }
     }
   }
 
@@ -363,6 +410,7 @@ export class SimulationEngine {
 
     // Public Bus Transit & Ridership calculation
     this.updateTransitMetrics();
+    this.updateRewardMetrics();
 
     const taxModR = (9 - this.taxRateR) * 3;
     const taxModC = (9 - this.taxRateC) * 3;
@@ -371,8 +419,11 @@ export class SimulationEngine {
     const transitBonusR = (this.ordinances.freeTransit ? 10 : 0) + (this.busRidership > 0 ? Math.min(10, Math.floor(this.busRidership / 20)) : 0);
     const transitBonusC = (this.ordinances.freeTransit ? 15 : 0) + (this.busRidership > 0 ? Math.min(15, Math.floor(this.busRidership / 15)) : 0);
 
-    this.demandR = Math.max(-80, Math.min(100, Math.floor(30 + taxModR + transitBonusR + (this.totalJobs - this.population * 0.7) * 1.5)));
-    this.demandC = Math.max(-80, Math.min(100, Math.floor(15 + taxModC + transitBonusC + (this.population * 0.35 - this.totalJobs * 0.2))));
+    const rewardBonusR = (this.hasMayorsMansion ? 10 : 0) + (this.hasGrandCentral ? 15 : 0);
+    const rewardBonusC = (this.hasMayorsMansion ? 10 : 0) + (this.hasGrandCentral ? 25 : 0);
+
+    this.demandR = Math.max(-80, Math.min(100, Math.floor(30 + taxModR + transitBonusR + rewardBonusR + (this.totalJobs - this.population * 0.7) * 1.5)));
+    this.demandC = Math.max(-80, Math.min(100, Math.floor(15 + taxModC + transitBonusC + rewardBonusC + (this.population * 0.35 - this.totalJobs * 0.2))));
     this.demandI = Math.max(-80, Math.min(100, Math.floor(25 + taxModI + (this.population * 0.5 - this.totalJobs * 0.6))));
   }
 
@@ -451,6 +502,7 @@ export class SimulationEngine {
     let baseEducation = 0;
     let baseTransit = 0;
     let baseUtilities = 0;
+    let baseCivicRewards = 0;
 
     const size = this.grid.size;
     for (let x = 0; x < size; x++) {
@@ -468,6 +520,9 @@ export class SimulationEngine {
         else if (t.type === TileType.SCHOOL) baseEducation += UPKEEP.SCHOOL;
         else if (t.type === TileType.BUS_DEPOT) baseTransit += UPKEEP.BUS_DEPOT;
         else if (t.type === TileType.BUS_STOP) baseTransit += UPKEEP.BUS_STOP;
+        else if (t.type === TileType.MAYORS_MANSION) baseCivicRewards += UPKEEP.MAYORS_MANSION;
+        else if (t.type === TileType.CITY_HALL) baseCivicRewards += UPKEEP.CITY_HALL;
+        else if (t.type === TileType.GRAND_CENTRAL) baseCivicRewards += UPKEEP.GRAND_CENTRAL;
       }
     }
 
@@ -482,6 +537,7 @@ export class SimulationEngine {
     const expenseEducation = Math.round(baseEducation * (this.fundingEducation / 100));
     const expenseTransit = Math.round(baseTransit * (this.fundingTransit / 100));
     const expenseUtilities = Math.round(baseUtilities);
+    const expenseCivicRewards = Math.round(baseCivicRewards);
 
     let expenseOrdinances = 0;
     if (this.ordinances.smokeDetectors) expenseOrdinances += ORDINANCE_COSTS.smokeDetectors;
@@ -490,7 +546,12 @@ export class SimulationEngine {
     if (this.ordinances.neighborhoodWatch) expenseOrdinances += ORDINANCE_COSTS.neighborhoodWatch;
     if (this.ordinances.readingCampaign) expenseOrdinances += ORDINANCE_COSTS.readingCampaign;
 
-    const totalExpenses = expenseRoads + expenseFire + expensePolice + expenseHealth + expenseEducation + expenseTransit + expenseUtilities + expenseOrdinances;
+    let subtotalExpenses = expenseRoads + expenseFire + expensePolice + expenseHealth + expenseEducation + expenseTransit + expenseUtilities + expenseOrdinances + expenseCivicRewards;
+    let cityHallDiscount = 0;
+    if (this.hasCityHall) {
+      cityHallDiscount = Math.round(subtotalExpenses * 0.10); // 10% City Hall administrative efficiency discount
+    }
+    const totalExpenses = subtotalExpenses - cityHallDiscount;
     const netMonthly = totalRevenue - totalExpenses;
 
     return {
@@ -506,6 +567,8 @@ export class SimulationEngine {
       expenseTransit,
       expenseUtilities,
       expenseOrdinances,
+      expenseCivicRewards,
+      cityHallDiscount,
       totalExpenses,
       netMonthly
     };
@@ -553,6 +616,7 @@ export class SimulationEngine {
         fundingEducation: this.fundingEducation,
         fundingTransit: this.fundingTransit,
         busRidership: this.busRidership,
+        unlockedMilestones: this.unlockedMilestones,
         weather: this.weather,
         ordinances: this.ordinances,
         month: this.month,
@@ -617,6 +681,9 @@ export class SimulationEngine {
       if (data.fundingEducation !== undefined) this.fundingEducation = data.fundingEducation;
       if (data.fundingTransit !== undefined) this.fundingTransit = data.fundingTransit;
       if (data.busRidership !== undefined) this.busRidership = data.busRidership;
+      if (Array.isArray(data.unlockedMilestones)) {
+        this.unlockedMilestones = data.unlockedMilestones;
+      }
       if (data.weather !== undefined) this.weather = data.weather;
       if (data.ordinances !== undefined) this.ordinances = { ...this.ordinances, ...data.ordinances };
 
@@ -677,6 +744,10 @@ export class SimulationEngine {
         this.fundingTransit,
         this.ordinances
       );
+
+      this.updateRewardMetrics();
+      this.updateTransitMetrics();
+      this.checkMilestones();
 
       if (this.onStatsUpdate) this.onStatsUpdate();
       if (this.onNotification) this.onNotification('📂 City loaded successfully!');

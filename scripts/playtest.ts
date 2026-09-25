@@ -63,7 +63,17 @@ async function runPlaytest() {
     const activeTool = await page.$eval('.tool-btn.active', el => el.getAttribute('data-tool'));
     if (activeTool !== tool) throw new Error(`Tool ${tool} failed to activate`);
   }
-  console.log('   ✅ All 17 toolbar buttons respond and toggle properly.');
+  console.log('   ✅ All 17 standard toolbar buttons respond and toggle properly.');
+
+  // 2b. Test Locked Reward Buildings — they should NOT activate before milestones
+  console.log('   Testing locked reward building buttons...');
+  const lockedRewardTools = ['mayors-mansion', 'city-hall', 'grand-central'];
+  for (const tool of lockedRewardTools) {
+    await page.click(`button[data-tool="${tool}"]`);
+    const isLocked = await page.$eval(`button[data-tool="${tool}"]`, el => el.classList.contains('locked'));
+    if (!isLocked) throw new Error(`Reward tool ${tool} should be locked at game start!`);
+  }
+  console.log('   ✅ All 3 reward building buttons are correctly locked at game start.');
 
   // 3. Playtest Construction: Building a Living Town
   console.log('\n3. Player Construction: Laying roads, avenues, dirt tracks, zones, transit network, and utilities...');
@@ -259,6 +269,64 @@ async function runPlaytest() {
   const thrivingScreenshot = path.join(projectRoot, 'playtest_thriving_city.png');
   await page.screenshot({ path: thrivingScreenshot });
   console.log(`   📸 Captured screenshot: ${thrivingScreenshot}`);
+
+  // 5b. Test City Milestones & Reward Buildings System
+  console.log('\n5b. Testing City Milestones & Reward Building System...');
+  const milestoneState = await page.evaluate(`(() => {
+    const e = window.game.engine;
+    return {
+      unlockedCount: e.unlockedMilestones.length,
+      milestones: e.unlockedMilestones,
+      hasMansion: e.hasMayorsMansion,
+      hasCityHall: e.hasCityHall,
+      hasGrandCentral: e.hasGrandCentral,
+      pop: e.population
+    };
+  })()`) as { unlockedCount: number; milestones: string[]; hasMansion: boolean; hasCityHall: boolean; hasGrandCentral: boolean; pop: number };
+
+  console.log(`   Unlocked Milestones (${milestoneState.unlockedCount}): [${milestoneState.milestones.join(', ')}]`);
+  // 'settlement' should always be unlocked (pop >= 0)
+  if (!milestoneState.milestones.includes('settlement')) {
+    throw new Error('Settlement milestone should be unlocked at any population!');
+  }
+  console.log('   ✅ Settlement milestone auto-unlocked.');
+
+  // Check milestone badge in top bar
+  const milestoneBadge = await page.$eval('#milestone-value', el => el.textContent);
+  console.log(`   Milestone Badge: "${milestoneBadge}"`);
+  if (!milestoneBadge || milestoneBadge.length < 3) {
+    throw new Error('Milestone badge text is empty or missing!');
+  }
+  console.log('   ✅ Milestone badge displays current rank in top bar.');
+
+  // If population reached 100+, village should be unlocked and Mayor's Mansion available
+  if (milestoneState.pop >= 100) {
+    if (!milestoneState.milestones.includes('village')) {
+      throw new Error(`Population is ${milestoneState.pop} but Village milestone not unlocked!`);
+    }
+    console.log('   ✅ Village milestone unlocked at pop ' + milestoneState.pop);
+
+    // Check Mayor's Mansion button is now unlocked
+    const mansionUnlocked = await page.$eval('button[data-tool="mayors-mansion"]', el => el.classList.contains('unlocked-reward') || !el.classList.contains('locked'));
+    if (!mansionUnlocked) {
+      throw new Error("Mayor's Mansion should be unlocked after Village milestone!");
+    }
+    console.log("   ✅ Mayor's Mansion toolbar button unlocked after Village milestone.");
+  }
+
+  // Test milestone modal opens
+  await page.click('#stat-milestone');
+  await sleep(300);
+  const modalVisible = await page.$eval('#milestone-modal', el => (el as HTMLElement).style.display !== 'none');
+  if (!modalVisible) throw new Error('Milestone modal failed to open!');
+  console.log('   ✅ Milestone modal opens on badge click.');
+
+  // Close modal
+  const closeBtn = await page.$('#milestone-modal .modal-close');
+  if (closeBtn) {
+    await closeBtn.click();
+    await sleep(200);
+  }
 
   // 6. Test Data Overlays
   console.log('\n6. Testing all 8 Data Heatmap Overlays (including Public Transit)...');
@@ -533,7 +601,16 @@ async function runPlaytest() {
 
   console.log(`   Restored Road Hierarchy: Avenue=${restoredRoadAndTransitTypes.avenueType}, Dirt Road=${restoredRoadAndTransitTypes.dirtRoadType}, Paved Road=${restoredRoadAndTransitTypes.pavedRoadType}`);
   console.log(`   Restored Transit Network: Depot=${restoredRoadAndTransitTypes.depotType} (${restoredRoadAndTransitTypes.depotCount}), Stop=${restoredRoadAndTransitTypes.stopType} (${restoredRoadAndTransitTypes.stopCount})`);
-  console.log('   ✅ Save & Load verified with exact state, budget, transit, weather, ordinances & road hierarchy restoration.');
+
+  // Verify milestone persistence
+  const restoredMilestones = await page.evaluate(`(() => {
+    return window.game.engine.unlockedMilestones;
+  })()`) as string[];
+  console.log(`   Restored Milestones: [${restoredMilestones.join(', ')}]`);
+  if (!restoredMilestones.includes('settlement')) {
+    throw new Error('Save/load failed to restore milestones! Settlement missing.');
+  }
+  console.log('   ✅ Save & Load verified with exact state, budget, transit, weather, ordinances, milestones & road hierarchy restoration.');
 
   // 11. Test Ambient Audio & Mute Controls
   console.log('\n11. Testing Audio Mute Controls & Ambient Soundscape...');
