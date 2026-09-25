@@ -5,3 +5,5 @@ dist
 .env.local
 npm-cache
 *.log
+.chrome-temp
+playtest_*.png

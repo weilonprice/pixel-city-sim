@@ -382,5 +382,8 @@ window.addEventListener('DOMContentLoaded', () => {
   }
   requestAnimationFrame(loop);
 
+  // Expose for testing and debugging
+  (window as unknown as { game: unknown }).game = { engine, grid, camera, hud, applyTool };
+
   hud.showToast("Connect your roads to the Interstate 10 interchange to bring citizens in!");
 });
