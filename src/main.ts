@@ -4,6 +4,7 @@ import { PixelRenderer } from './rendering/PixelRenderer.ts';
 import { SimulationEngine } from './simulation/SimulationEngine.ts';
 import { HUD } from './ui/HUD.ts';
 import { MiniMap } from './ui/MiniMap.ts';
+import { SnapshotTool } from './ui/SnapshotTool.ts';
 import { TileType, ZoneType, COSTS } from './core/Constants.ts';
 import { sounds } from './core/SoundEffects.ts';
 
@@ -20,6 +21,20 @@ window.addEventListener('DOMContentLoaded', () => {
   const camera = new Camera(window.innerWidth, window.innerHeight - 112, grid.size);
   const renderer = new PixelRenderer(ctx, camera, grid, engine);
   const hud = new HUD(engine);
+
+  // Initialize Snapshot Tool
+  const snapshotTool = new SnapshotTool(canvas, engine, (msg) => hud.showToast(msg));
+  hud.snapshotTool = snapshotTool;
+
+  // Initialize soundscape on first interaction
+  const initAudioOnFirstGesture = () => {
+    sounds.initCtx();
+    sounds.startAmbientLoop();
+    window.removeEventListener('pointerdown', initAudioOnFirstGesture);
+    window.removeEventListener('keydown', initAudioOnFirstGesture);
+  };
+  window.addEventListener('pointerdown', initAudioOnFirstGesture);
+  window.addEventListener('keydown', initAudioOnFirstGesture);
 
   // Initialize Radar Mini-Map
   const minimapCanvas = document.getElementById('minimap-canvas') as HTMLCanvasElement;
@@ -434,6 +449,15 @@ window.addEventListener('DOMContentLoaded', () => {
   // Main Simulation Loop (1 Tick per second)
   setInterval(() => {
     engine.tick();
+
+    // Dynamically update procedural city ambient soundscape
+    let activeFires = 0;
+    for (let x = 0; x < grid.size; x++) {
+      for (let y = 0; y < grid.size; y++) {
+        if (grid.tiles[x][y].building?.onFire) activeFires++;
+      }
+    }
+    sounds.updateAmbient(engine.population, engine.totalIndustrialJobs, engine.gameHour, activeFires);
   }, 1000);
 
   // Auto-Save every 60 seconds
@@ -458,7 +482,7 @@ window.addEventListener('DOMContentLoaded', () => {
   requestAnimationFrame(loop);
 
   // Expose for testing and debugging
-  (window as unknown as { game: unknown }).game = { engine, grid, camera, hud, applyTool };
+  (window as unknown as { game: unknown }).game = { engine, grid, camera, hud, applyTool, snapshotTool, sounds };
 
   hud.showToast("Connect your roads to the Interstate 10 interchange to bring citizens in!");
 });

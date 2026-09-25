@@ -72,8 +72,10 @@ A prioritized development roadmap and feature checklist for expanding **Pixel Ci
   - [ ] Gentle pixel rain with puddle ripples.
   - [ ] Thunderstorms with flash lightning and thunder audio.
   - [ ] Winter snow dustings on rooftops.
-- [x] **Audio SFX**
-  - [x] 16-bit Web Audio synth build clicks, demolition crunches, coins, and error buzzers.
+- [x] **Audio SFX & Dynamic Ambient Soundscape**
+  - [x] 16-bit Web Audio synth build clicks, demolition crunches, coins, camera shutters, and error buzzers.
+  - [x] Dynamic ambient soundscape: breeze/nature loop, traffic hum scaled with population, industrial hum, emergency sirens, and nighttime crickets.
+  - [x] Master mute toggle button (`🔊`/`🔇`) with `M` key shortcut and LocalStorage persistence.
 
 ---
 
@@ -97,5 +99,6 @@ A prioritized development roadmap and feature checklist for expanding **Pixel Ci
   - [x] Automated layout generation, road and highway connectivity verification, RCI zoning growth, and tax assertions.
   - [x] Full visual verification and regression detection across all 7 heatmap overlays.
   - [x] Deterministic save and cold-boot load verification.
-- [ ] **City Snapshot / Camera Tool**
-  - [ ] One-click high-resolution screenshot export without UI clutter.
+- [x] **City Snapshot / Camera Tool**
+  - [x] One-click high-resolution screenshot export without UI clutter (`📸 Photo` button & `P` shortcut).
+  - [x] Vintage camera flash overlay animation with shutter sound effect.

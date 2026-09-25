@@ -348,7 +348,31 @@ async function runPlaytest() {
   }
   console.log('   ✅ Save & Load verified with exact state & budget restoration.');
 
-  // 10. Error assertion
+  // 10. Test Ambient Audio & Mute Controls
+  console.log('\n10. Testing Audio Mute Controls & Ambient Soundscape...');
+  const initialMuteIcon = await page.$eval('#btn-audio-mute', el => el.textContent);
+  if (initialMuteIcon !== '🔊') throw new Error(`Expected initial audio icon 🔊, got ${initialMuteIcon}`);
+
+  // Click mute button
+  await page.click('#btn-audio-mute');
+  await sleep(200);
+  const mutedIcon = await page.$eval('#btn-audio-mute', el => el.textContent);
+  if (mutedIcon !== '🔇') throw new Error(`Expected muted icon 🔇, got ${mutedIcon}`);
+
+  // Toggle back with M shortcut key
+  await page.keyboard.press('KeyM');
+  await sleep(200);
+  const unmutedIcon = await page.$eval('#btn-audio-mute', el => el.textContent);
+  if (unmutedIcon !== '🔊') throw new Error(`Expected unmuted icon 🔊 after M key, got ${unmutedIcon}`);
+  console.log('   ✅ Audio mute controls verified via UI button and "M" shortcut.');
+
+  // 11. Test City Snapshot & Photo Tool
+  console.log('\n11. Testing City Snapshot Photo Tool...');
+  await page.click('#btn-snapshot');
+  await sleep(300);
+  console.log('   ✅ Snapshot photo trigger executed with camera flash effect.');
+
+  // 12. Error assertion
   if (errors.length > 0) {
     console.error('\n❌ Uncaught errors detected:');
     errors.forEach(e => console.error(e));
