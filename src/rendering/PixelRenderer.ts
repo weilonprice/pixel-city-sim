@@ -1,4 +1,4 @@
-import { TILE_WIDTH, TILE_HEIGHT, TileType, ZoneType, Tile, OverlayMode, WeatherType } from '../core/Constants.ts';
+import { TILE_WIDTH, TILE_HEIGHT, TileType, ZoneType, Tile, OverlayMode, WeatherType, isAnyRoad } from '../core/Constants.ts';
 import { Camera } from '../core/Camera.ts';
 import { Grid } from '../simulation/Grid.ts';
 import { SimulationEngine } from '../simulation/SimulationEngine.ts';
@@ -143,11 +143,11 @@ export class PixelRenderer {
     // 4. Render Highway & Bridges & Roads
     if (tile.type === TileType.HIGHWAY) {
       this.drawHighwayTile(sx, sy, halfW, halfH, tile);
-    } else if (tile.type === TileType.ROAD) {
+    } else if (tile.type === TileType.ROAD || tile.type === TileType.DIRT_ROAD || tile.type === TileType.AVENUE) {
       if (tile.isBridge) {
-        this.drawBridgeTile(sx, sy, halfW, halfH, tile.roadMask);
+        this.drawBridgeTile(sx, sy, halfW, halfH, tile.roadMask, tile.type);
       } else {
-        this.drawRoadTile(sx, sy, halfW, halfH, tile.roadMask, tile.connectedToHighway);
+        this.drawRoadTile(sx, sy, halfW, halfH, tile.roadMask, tile.connectedToHighway, tile.type);
       }
     }
 
@@ -277,12 +277,109 @@ export class PixelRenderer {
 
   /**
    * Steel Truss Bridge over Water
+  /**
+   * Bridges over Water (Timber Trestle, Steel Truss, or Cable-Stayed Concrete)
    */
-  private drawBridgeTile(sx: number, sy: number, hw: number, hh: number, mask: number) {
+  private drawBridgeTile(sx: number, sy: number, hw: number, hh: number, mask: number, roadType: TileType = TileType.ROAD) {
     const ctx = this.ctx;
     const z = this.camera.zoom;
 
-    // Concrete river piers underneath bridge deck
+    if (roadType === TileType.DIRT_ROAD) {
+      // 1. Timber Trestle Bridge (Rustic wooden pilings, timber deck, log railings)
+      ctx.fillStyle = '#452b11';
+      ctx.fillRect(sx - 5 * z, sy + hh * 0.4, 3 * z, 14 * z);
+      ctx.fillRect(sx + 2 * z, sy + hh * 0.4, 3 * z, 14 * z);
+
+      // Wooden cross braces
+      ctx.strokeStyle = '#38220d';
+      ctx.lineWidth = 1.5 * z;
+      ctx.beginPath();
+      ctx.moveTo(sx - 5 * z, sy + hh * 0.4);
+      ctx.lineTo(sx + 5 * z, sy + hh * 0.4 + 14 * z);
+      ctx.moveTo(sx + 5 * z, sy + hh * 0.4);
+      ctx.lineTo(sx - 5 * z, sy + hh * 0.4 + 14 * z);
+      ctx.stroke();
+
+      // Wooden Plank Deck
+      ctx.fillStyle = '#785028';
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - hh * 0.75);
+      ctx.lineTo(sx + hw * 0.75, sy);
+      ctx.lineTo(sx, sy + hh * 0.75);
+      ctx.lineTo(sx - hw * 0.75, sy);
+      ctx.closePath();
+      ctx.fill();
+
+      // Rustic Timber Railings
+      ctx.strokeStyle = '#5c3d1e';
+      ctx.lineWidth = 2 * z;
+      ctx.beginPath();
+      ctx.moveTo(sx - hw * 0.65, sy - 6 * z);
+      ctx.lineTo(sx, sy + hh * 0.65 - 6 * z);
+      ctx.moveTo(sx, sy - hh * 0.65 - 6 * z);
+      ctx.lineTo(sx + hw * 0.65, sy - 6 * z);
+      ctx.stroke();
+      return;
+    }
+
+    if (roadType === TileType.AVENUE) {
+      // 2. Cable-Stayed Concrete Bridge (White concrete piers, wide deck, blue guardrails, suspension tower)
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillRect(sx - 6 * z, sy + hh * 0.5, 12 * z, 16 * z);
+      ctx.fillStyle = '#64748b';
+      ctx.fillRect(sx - 3 * z, sy + hh * 0.5, 6 * z, 16 * z);
+
+      // Elevated Wide Asphalt Deck
+      ctx.fillStyle = '#1e1e24';
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - hh * 0.85);
+      ctx.lineTo(sx + hw * 0.85, sy);
+      ctx.lineTo(sx, sy + hh * 0.85);
+      ctx.lineTo(sx - hw * 0.85, sy);
+      ctx.closePath();
+      ctx.fill();
+
+      // Blue steel safety barriers
+      ctx.strokeStyle = '#2563eb';
+      ctx.lineWidth = 2.5 * z;
+      ctx.beginPath();
+      ctx.moveTo(sx - hw * 0.75, sy - 8 * z);
+      ctx.lineTo(sx, sy + hh * 0.75 - 8 * z);
+      ctx.moveTo(sx, sy - hh * 0.75 - 8 * z);
+      ctx.lineTo(sx + hw * 0.75, sy - 8 * z);
+      ctx.stroke();
+
+      // Tall central white suspension pylon
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(sx - 2.5 * z, sy - 28 * z, 5 * z, 28 * z);
+      ctx.fillStyle = '#cbd5e1';
+      ctx.fillRect(sx - 1 * z, sy - 28 * z, 2 * z, 28 * z);
+
+      // Angled silver tension cables
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 1 * z;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - 26 * z);
+      ctx.lineTo(sx - hw * 0.65, sy - 4 * z);
+      ctx.moveTo(sx, sy - 20 * z);
+      ctx.lineTo(sx - hw * 0.45, sy - 4 * z);
+      ctx.moveTo(sx, sy - 26 * z);
+      ctx.lineTo(sx + hw * 0.65, sy - 4 * z);
+      ctx.moveTo(sx, sy - 20 * z);
+      ctx.lineTo(sx + hw * 0.45, sy - 4 * z);
+      ctx.stroke();
+
+      // Center double yellow line on bridge
+      ctx.strokeStyle = '#facc15';
+      ctx.lineWidth = 1.2 * z;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - hh * 0.5);
+      ctx.lineTo(sx, sy + hh * 0.5);
+      ctx.stroke();
+      return;
+    }
+
+    // 3. Steel Truss Bridge over Water
     ctx.fillStyle = '#475569';
     ctx.fillRect(sx - 4 * z, sy + hh * 0.5, 8 * z, 14 * z);
     ctx.fillStyle = '#334155';
@@ -426,8 +523,193 @@ export class PixelRenderer {
     return neighbors.some(n => n.tile.type === TileType.WATER);
   }
 
-  private drawRoadTile(sx: number, sy: number, hw: number, hh: number, mask: number, connectedToHighway: boolean) {
+  private drawRoadTile(sx: number, sy: number, hw: number, hh: number, mask: number, connectedToHighway: boolean, roadType: TileType = TileType.ROAD) {
     const ctx = this.ctx;
+    const z = this.camera.zoom;
+
+    if (roadType === TileType.DIRT_ROAD) {
+      // 1. Country Dirt Road (Packed earth & clay with rough rut tracks)
+      const dirtColor = connectedToHighway ? '#7c5328' : '#6b4623';
+      const dirtBorder = '#4a2f14';
+      const rutColor = '#452b11';
+
+      ctx.fillStyle = dirtColor;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - hh);
+      ctx.lineTo(sx + hw, sy);
+      ctx.lineTo(sx, sy + hh);
+      ctx.lineTo(sx - hw, sy);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = dirtBorder;
+      ctx.lineWidth = Math.max(1, 1 * z);
+      ctx.stroke();
+
+      // Parallel wheel ruts along road directions
+      ctx.strokeStyle = rutColor;
+      ctx.lineWidth = Math.max(1, 1.2 * z);
+
+      if ((mask & 5) === 5 || mask === 0) {
+        ctx.beginPath();
+        ctx.moveTo(sx - 3 * z, sy - hh * 0.6);
+        ctx.lineTo(sx - 3 * z, sy + hh * 0.6);
+        ctx.moveTo(sx + 3 * z, sy - hh * 0.6);
+        ctx.lineTo(sx + 3 * z, sy + hh * 0.6);
+        ctx.stroke();
+      } else if ((mask & 10) === 10) {
+        ctx.beginPath();
+        ctx.moveTo(sx - hw * 0.6, sy - 2 * z);
+        ctx.lineTo(sx + hw * 0.6, sy - 2 * z);
+        ctx.moveTo(sx - hw * 0.6, sy + 2 * z);
+        ctx.lineTo(sx + hw * 0.6, sy + 2 * z);
+        ctx.stroke();
+      } else {
+        if (mask & 1) {
+          ctx.beginPath();
+          ctx.moveTo(sx - 2 * z, sy);
+          ctx.lineTo(sx - 2 * z, sy - hh * 0.6);
+          ctx.moveTo(sx + 2 * z, sy);
+          ctx.lineTo(sx + 2 * z, sy - hh * 0.6);
+          ctx.stroke();
+        }
+        if (mask & 2) {
+          ctx.beginPath();
+          ctx.moveTo(sx, sy - 2 * z);
+          ctx.lineTo(sx + hw * 0.6, sy - 2 * z);
+          ctx.moveTo(sx, sy + 2 * z);
+          ctx.lineTo(sx + hw * 0.6, sy + 2 * z);
+          ctx.stroke();
+        }
+        if (mask & 4) {
+          ctx.beginPath();
+          ctx.moveTo(sx - 2 * z, sy);
+          ctx.lineTo(sx - 2 * z, sy + hh * 0.6);
+          ctx.moveTo(sx + 2 * z, sy);
+          ctx.lineTo(sx + 2 * z, sy + hh * 0.6);
+          ctx.stroke();
+        }
+        if (mask & 8) {
+          ctx.beginPath();
+          ctx.moveTo(sx, sy - 2 * z);
+          ctx.lineTo(sx - hw * 0.6, sy - 2 * z);
+          ctx.moveTo(sx, sy + 2 * z);
+          ctx.lineTo(sx - hw * 0.6, sy + 2 * z);
+          ctx.stroke();
+        }
+      }
+
+      if (z >= 0.8) {
+        ctx.fillStyle = '#9c6c39';
+        ctx.fillRect(sx - 4 * z, sy - 2 * z, 1.5 * z, 1.5 * z);
+        ctx.fillRect(sx + 5 * z, sy + 3 * z, 1.5 * z, 1.5 * z);
+      }
+      return;
+    }
+
+    if (roadType === TileType.AVENUE) {
+      // 2. Downtown 4-Lane Avenue (Deep charcoal asphalt, concrete curbs, double yellow center line, white lane dashes)
+      const aveColor = connectedToHighway ? '#1b1b22' : '#2b2b35';
+      const curbColor = '#64748b';
+      const doubleYellow = '#facc15';
+      const whiteLane = '#f8fafc';
+
+      ctx.fillStyle = aveColor;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - hh);
+      ctx.lineTo(sx + hw, sy);
+      ctx.lineTo(sx, sy + hh);
+      ctx.lineTo(sx - hw, sy);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = curbColor;
+      ctx.lineWidth = Math.max(1.5, 2 * z);
+      ctx.stroke();
+
+      if ((mask & 5) === 5 || mask === 0) {
+        ctx.strokeStyle = doubleYellow;
+        ctx.lineWidth = Math.max(1, 1.2 * z);
+        ctx.beginPath();
+        ctx.moveTo(sx - 1.5 * z, sy - hh * 0.65);
+        ctx.lineTo(sx - 1.5 * z, sy + hh * 0.65);
+        ctx.moveTo(sx + 1.5 * z, sy - hh * 0.65);
+        ctx.lineTo(sx + 1.5 * z, sy + hh * 0.65);
+        ctx.stroke();
+
+        ctx.strokeStyle = whiteLane;
+        ctx.lineWidth = Math.max(1, 1 * z);
+        ctx.setLineDash([3 * z, 3 * z]);
+        ctx.beginPath();
+        ctx.moveTo(sx - hw * 0.35, sy - hh * 0.5);
+        ctx.lineTo(sx - hw * 0.35, sy + hh * 0.5);
+        ctx.moveTo(sx + hw * 0.35, sy - hh * 0.5);
+        ctx.lineTo(sx + hw * 0.35, sy + hh * 0.5);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      } else if ((mask & 10) === 10) {
+        ctx.strokeStyle = doubleYellow;
+        ctx.lineWidth = Math.max(1, 1.2 * z);
+        ctx.beginPath();
+        ctx.moveTo(sx - hw * 0.65, sy - 1.5 * z);
+        ctx.lineTo(sx + hw * 0.65, sy - 1.5 * z);
+        ctx.moveTo(sx - hw * 0.65, sy + 1.5 * z);
+        ctx.lineTo(sx + hw * 0.65, sy + 1.5 * z);
+        ctx.stroke();
+
+        ctx.strokeStyle = whiteLane;
+        ctx.lineWidth = Math.max(1, 1 * z);
+        ctx.setLineDash([3 * z, 3 * z]);
+        ctx.beginPath();
+        ctx.moveTo(sx - hw * 0.5, sy - hh * 0.35);
+        ctx.lineTo(sx + hw * 0.5, sy - hh * 0.35);
+        ctx.moveTo(sx - hw * 0.5, sy + hh * 0.35);
+        ctx.lineTo(sx + hw * 0.5, sy + hh * 0.35);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      } else {
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(sx - 4 * z, sy - 4 * z, 8 * z, 8 * z);
+
+        ctx.strokeStyle = doubleYellow;
+        ctx.lineWidth = Math.max(1, 1.2 * z);
+
+        if (mask & 1) {
+          ctx.beginPath();
+          ctx.moveTo(sx - 1.5 * z, sy);
+          ctx.lineTo(sx - 1.5 * z, sy - hh * 0.65);
+          ctx.moveTo(sx + 1.5 * z, sy);
+          ctx.lineTo(sx + 1.5 * z, sy - hh * 0.65);
+          ctx.stroke();
+        }
+        if (mask & 2) {
+          ctx.beginPath();
+          ctx.moveTo(sx, sy - 1.5 * z);
+          ctx.lineTo(sx + hw * 0.65, sy - 1.5 * z);
+          ctx.moveTo(sx, sy + 1.5 * z);
+          ctx.lineTo(sx + hw * 0.65, sy + 1.5 * z);
+          ctx.stroke();
+        }
+        if (mask & 4) {
+          ctx.beginPath();
+          ctx.moveTo(sx - 1.5 * z, sy);
+          ctx.lineTo(sx - 1.5 * z, sy + hh * 0.65);
+          ctx.moveTo(sx + 1.5 * z, sy);
+          ctx.lineTo(sx + 1.5 * z, sy + hh * 0.65);
+          ctx.stroke();
+        }
+        if (mask & 8) {
+          ctx.beginPath();
+          ctx.moveTo(sx, sy - 1.5 * z);
+          ctx.lineTo(sx - hw * 0.65, sy - 1.5 * z);
+          ctx.moveTo(sx, sy + 1.5 * z);
+          ctx.lineTo(sx - hw * 0.65, sy + 1.5 * z);
+          ctx.stroke();
+        }
+      }
+      return;
+    }
+
     const roadColor = connectedToHighway ? '#33333e' : '#454552';
     const roadBorder = '#1c1c24';
     const stripeColor = connectedToHighway ? '#fbbf24' : '#9ca3af';
@@ -442,10 +724,9 @@ export class PixelRenderer {
     ctx.fill();
 
     ctx.strokeStyle = roadBorder;
-    ctx.lineWidth = Math.max(1, 1 * this.camera.zoom);
+    ctx.lineWidth = Math.max(1, 1 * z);
     ctx.stroke();
 
-    const z = this.camera.zoom;
     ctx.fillStyle = stripeColor;
 
     if ((mask & 5) === 5 || mask === 0) {
@@ -1009,7 +1290,7 @@ export class PixelRenderer {
 
     const affectedTiles: { x: number; y: number }[] = [];
 
-    if (tool === 'road') {
+    if (tool === 'road' || tool === 'dirt-road' || tool === 'avenue') {
       const dx = endX - startX;
       const dy = endY - startY;
       if (Math.abs(dx) >= Math.abs(dy)) {
@@ -1065,11 +1346,21 @@ export class PixelRenderer {
       fillColor = 'rgba(234, 179, 8, 0.45)';
       toolName = 'Industrial Zone';
       unitCost = 50;
+    } else if (tool === 'dirt-road') {
+      strokeColor = '#a16207';
+      fillColor = 'rgba(161, 98, 7, 0.45)';
+      toolName = 'Country Dirt Road';
+      unitCost = 5;
     } else if (tool === 'road') {
       strokeColor = '#f59e0b';
       fillColor = 'rgba(245, 158, 11, 0.45)';
-      toolName = 'Road Network';
+      toolName = 'Paved Street';
       unitCost = 10;
+    } else if (tool === 'avenue') {
+      strokeColor = '#818cf8';
+      fillColor = 'rgba(129, 140, 248, 0.45)';
+      toolName = 'Downtown Avenue';
+      unitCost = 25;
     } else if (tool === 'demolish') {
       strokeColor = '#ef4444';
       fillColor = 'rgba(239, 68, 68, 0.45)';
@@ -1108,7 +1399,8 @@ export class PixelRenderer {
     const totalCost = count * unitCost;
     const w = Math.abs(endX - startX) + 1;
     const h = Math.abs(endY - startY) + 1;
-    const dimText = tool === 'road' ? `${count} tiles` : `${w}×${h} (${count} tiles)`;
+    const isLineTool = tool === 'road' || tool === 'dirt-road' || tool === 'avenue';
+    const dimText = isLineTool ? `${count} tiles` : `${w}×${h} (${count} tiles)`;
     const text = `${toolName} • ${dimText} • $${totalCost.toLocaleString()}`;
 
     ctx.save();
@@ -1208,13 +1500,13 @@ export class PixelRenderer {
       for (let x = 0; x < this.grid.size; x++) {
         for (let y = 0; y < this.grid.size; y++) {
           const t = this.grid.getTile(x, y);
-          if (t && t.type === TileType.ROAD && t.connectedToHighway) roadTiles.push(t);
+          if (t && isAnyRoad(t.type) && t.type !== TileType.HIGHWAY && t.connectedToHighway) roadTiles.push(t);
         }
       }
 
       if (roadTiles.length > 2) {
         const start = roadTiles[Math.floor(Math.random() * roadTiles.length)];
-        const neighbors = this.grid.getNeighbors(start.x, start.y).filter(n => n.tile.type === TileType.ROAD);
+        const neighbors = this.grid.getNeighbors(start.x, start.y).filter(n => isAnyRoad(n.tile.type));
         if (neighbors.length > 0) {
           const target = neighbors[Math.floor(Math.random() * neighbors.length)].tile;
           const colors = ['#f59e0b', '#3b82f6', '#ef4444', '#10b981', '#f3f4f6'];
@@ -1261,11 +1553,19 @@ export class PixelRenderer {
             continue;
           }
         } else {
-          const neighbors = this.grid.getNeighbors(v.targetX, v.targetY).filter(n => n.tile.type === TileType.ROAD || n.tile.type === TileType.HIGHWAY);
+          const neighbors = this.grid.getNeighbors(v.targetX, v.targetY).filter(n => isAnyRoad(n.tile.type));
           if (neighbors.length > 0) {
             const next = neighbors[Math.floor(Math.random() * neighbors.length)].tile;
             v.targetX = next.x;
             v.targetY = next.y;
+            // Dynamically scale vehicle speed based on road type
+            if (next.type === TileType.AVENUE) {
+              v.speed = v.isEmergency ? 0.07 : 0.05;
+            } else if (next.type === TileType.DIRT_ROAD) {
+              v.speed = v.isEmergency ? 0.045 : 0.025;
+            } else {
+              v.speed = v.isEmergency ? 0.055 : 0.035;
+            }
           } else {
             this.vehicles.splice(i, 1);
             continue;

@@ -14,6 +14,8 @@ export enum TileType {
   WATER = 'WATER',
   DIRT = 'DIRT',
   ROAD = 'ROAD',
+  DIRT_ROAD = 'DIRT_ROAD',
+  AVENUE = 'AVENUE',
   HIGHWAY = 'HIGHWAY',
   BUILDING = 'BUILDING',
   POWER_PLANT = 'POWER_PLANT',
@@ -23,6 +25,10 @@ export enum TileType {
   POLICE_STATION = 'POLICE_STATION',
   HOSPITAL = 'HOSPITAL',
   SCHOOL = 'SCHOOL'
+}
+
+export function isAnyRoad(type: TileType): boolean {
+  return type === TileType.ROAD || type === TileType.DIRT_ROAD || type === TileType.AVENUE || type === TileType.HIGHWAY;
 }
 
 export enum OverlayMode {
@@ -103,7 +109,11 @@ export interface Tile {
 
 export const COSTS = {
   ROAD: 10,
+  DIRT_ROAD: 5,
+  AVENUE: 25,
   BRIDGE: 50,
+  DIRT_BRIDGE: 25,
+  AVENUE_BRIDGE: 100,
   ZONE: 50,
   DEMOLISH: 5,
   POWER_PLANT: 1000,
@@ -117,7 +127,11 @@ export const COSTS = {
 
 export const UPKEEP = {
   ROAD: 0.1,
+  DIRT_ROAD: 0.05,
+  AVENUE: 0.25,
   BRIDGE: 0.5,
+  DIRT_BRIDGE: 0.25,
+  AVENUE_BRIDGE: 1.0,
   POWER_PLANT: 25,
   WATER_PUMP: 15,
   PARK: 5,

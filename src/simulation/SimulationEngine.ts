@@ -1,4 +1,4 @@
-import { TileType, ZoneType, Tile, BuildingData, UPKEEP, OverlayMode, WeatherType, CityOrdinances, ORDINANCE_COSTS } from '../core/Constants.ts';
+import { TileType, ZoneType, Tile, BuildingData, UPKEEP, OverlayMode, WeatherType, CityOrdinances, ORDINANCE_COSTS, isAnyRoad } from '../core/Constants.ts';
 import { Grid } from './Grid.ts';
 import { sounds } from '../core/SoundEffects.ts';
 
@@ -190,7 +190,7 @@ export class SimulationEngine {
 
       for (const n of neighbors) {
         const t = n.tile;
-        if (!t.powered && (t.type === TileType.ROAD || t.type === TileType.HIGHWAY || t.type === TileType.PARK || t.type === TileType.POWER_PLANT || t.type === TileType.WATER_PUMP || t.type === TileType.FIRE_STATION || t.type === TileType.POLICE_STATION || t.type === TileType.HOSPITAL || t.type === TileType.SCHOOL || t.building)) {
+        if (!t.powered && (isAnyRoad(t.type) || t.type === TileType.PARK || t.type === TileType.POWER_PLANT || t.type === TileType.WATER_PUMP || t.type === TileType.FIRE_STATION || t.type === TileType.POLICE_STATION || t.type === TileType.HOSPITAL || t.type === TileType.SCHOOL || t.building)) {
           t.powered = true;
           if (t.building) t.building.powered = true;
           powerQueue.push(t);
@@ -204,7 +204,7 @@ export class SimulationEngine {
 
       for (const n of neighbors) {
         const t = n.tile;
-        if (!t.watered && (t.type === TileType.ROAD || t.type === TileType.PARK || t.type === TileType.WATER_PUMP || t.type === TileType.FIRE_STATION || t.type === TileType.POLICE_STATION || t.type === TileType.HOSPITAL || t.type === TileType.SCHOOL || t.building)) {
+        if (!t.watered && (isAnyRoad(t.type) || t.type === TileType.PARK || t.type === TileType.WATER_PUMP || t.type === TileType.FIRE_STATION || t.type === TileType.POLICE_STATION || t.type === TileType.HOSPITAL || t.type === TileType.SCHOOL || t.building)) {
           t.watered = true;
           if (t.building) t.building.watered = true;
           waterQueue.push(t);
@@ -406,6 +406,8 @@ export class SimulationEngine {
       for (let y = 0; y < size; y++) {
         const t = this.grid.tiles[x][y];
         if (t.type === TileType.ROAD) baseRoads += t.isBridge ? UPKEEP.BRIDGE : UPKEEP.ROAD;
+        else if (t.type === TileType.DIRT_ROAD) baseRoads += t.isBridge ? UPKEEP.DIRT_BRIDGE : UPKEEP.DIRT_ROAD;
+        else if (t.type === TileType.AVENUE) baseRoads += t.isBridge ? UPKEEP.AVENUE_BRIDGE : UPKEEP.AVENUE;
         else if (t.type === TileType.POWER_PLANT) baseUtilities += UPKEEP.POWER_PLANT;
         else if (t.type === TileType.WATER_PUMP) baseUtilities += UPKEEP.WATER_PUMP;
         else if (t.type === TileType.PARK) baseUtilities += UPKEEP.PARK;
