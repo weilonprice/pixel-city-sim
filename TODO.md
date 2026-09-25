@@ -94,7 +94,17 @@ A prioritized development roadmap and feature checklist for expanding **Pixel Ci
 
 ---
 
-## 🔍 Priority 5: Inspector & Citizen Life
+## 🏙️ Priority 5: High-Density Skylines & Modern Glass Towers
+
+- [x] **High-Density Skylines & Modern Glass Towers (Tier 4 & Tier 5)**
+  - [x] **Tier 4 & Tier 5 Residential**: Horizon Residences luxury condominiums with balconies & rooftop infinity pool (~180 pop), and Apex Pinnacle glass megatower with sky lounge and red strobe beacon (~350 pop).
+  - [x] **Tier 4 & Tier 5 Commercial**: Corporate Financial Plaza with emerald/navy glass, financial stock ticker & helipad (~150 jobs), and World Trade Megatower with Hancock-style structural X-bracing, golden observation deck, and dual broadcast masts with alternating warning strobes (~320 jobs).
+  - [x] **Tier 4 & Tier 5 Industrial**: Clean Biotech & Research Campus with solar arrays, bioreactors & clean white steam (~160 jobs, pollution 18), and Aerospace & Robotics Megafactory with geodesic glass dome, neon core, gantry & satellite dish (~300 jobs, near-zero pollution 8).
+  - [x] **Skyscraper Progression Engine**: Multi-service upgrade requirements (land value > 65/80, healthcare, education, fire & police, and transit coverage), synth skyscraper fanfare arpeggio, and news ticker bulletins.
+
+---
+
+## 🔍 Priority 6: Inspector & Citizen Life
 
 - [x] **Tile & Citizen Inspector Panel**
   - [x] Click any building to view: Stage, residents, jobs, utilities, highway link, and land value.
