@@ -1,13 +1,21 @@
 import { SimulationEngine } from '../simulation/SimulationEngine.ts';
 import { sounds } from '../core/SoundEffects.ts';
 import { OverlayMode } from '../core/Constants.ts';
+import { BudgetModal } from './BudgetModal.ts';
+import { NewsTicker } from './NewsTicker.ts';
 
 export class HUD {
   private engine: SimulationEngine;
   public activeTool: string = 'inspect';
 
+  // Sub-components
+  public budgetModal: BudgetModal;
+  public newsTicker: NewsTicker;
+
   // DOM Elements
   private fundsEl: HTMLElement;
+  private fundsBadgeEl: HTMLElement;
+  private budgetBtn: HTMLButtonElement;
   private popEl: HTMLElement;
   private dateEl: HTMLElement;
   private rciREl: HTMLElement;
@@ -27,6 +35,8 @@ export class HUD {
     this.engine = engine;
 
     this.fundsEl = document.getElementById('funds-value')!;
+    this.fundsBadgeEl = document.getElementById('stat-funds')!;
+    this.budgetBtn = document.getElementById('btn-budget') as HTMLButtonElement;
     this.popEl = document.getElementById('pop-value')!;
     this.dateEl = document.getElementById('date-value')!;
     this.rciREl = document.getElementById('rci-r-fill')!;
@@ -39,11 +49,30 @@ export class HUD {
     this.toolButtons = document.querySelectorAll('.tool-btn');
     this.speedButtons = document.querySelectorAll('.speed-btn');
 
+    // Initialize sub-components
+    this.budgetModal = new BudgetModal(this.engine);
+    const tickerEl = document.getElementById('news-ticker')!;
+    const tickerTextEl = document.getElementById('ticker-text')!;
+    this.newsTicker = new NewsTicker(this.engine, tickerEl, tickerTextEl);
+
+    this.budgetModal.onApply = () => {
+      this.updateStats();
+    };
+
     this.setupEventListeners();
+    this.setupKeyboardShortcuts();
     this.updateStats();
 
-    this.engine.onStatsUpdate = () => this.updateStats();
-    this.engine.onNotification = (msg: string) => this.showToast(msg);
+    this.engine.onStatsUpdate = () => {
+      this.updateStats();
+      if (this.budgetModal.isOpen()) {
+        this.budgetModal.updateDisplay();
+      }
+    };
+    this.engine.onNotification = (msg: string) => {
+      this.showToast(msg);
+      this.newsTicker.triggerEmergency(msg);
+    };
   }
 
   private setupEventListeners() {
@@ -51,13 +80,7 @@ export class HUD {
     this.toolButtons.forEach(btn => {
       btn.addEventListener('click', () => {
         sounds.playClick();
-        this.toolButtons.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        this.activeTool = btn.dataset.tool || 'inspect';
-
-        if (this.onToolChange) {
-          this.onToolChange(this.activeTool);
-        }
+        this.selectTool(btn.dataset.tool || 'inspect');
       });
     });
 
@@ -65,10 +88,8 @@ export class HUD {
     this.speedButtons.forEach(btn => {
       btn.addEventListener('click', () => {
         sounds.playClick();
-        this.speedButtons.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
         const speed = parseInt(btn.dataset.speed || '1', 10);
-        this.engine.setSpeed(speed);
+        this.setSpeed(speed);
       });
     });
 
@@ -90,6 +111,82 @@ export class HUD {
       sounds.playClick();
       this.engine.loadFromLocalStorage();
     });
+
+    // Budget Modal Button & Treasury Click
+    const openBudget = () => {
+      sounds.playClick();
+      this.budgetModal.toggle();
+    };
+
+    if (this.budgetBtn) {
+      this.budgetBtn.addEventListener('click', openBudget);
+    }
+    if (this.fundsBadgeEl) {
+      this.fundsBadgeEl.addEventListener('click', openBudget);
+    }
+  }
+
+  private setupKeyboardShortcuts() {
+    window.addEventListener('keydown', (e) => {
+      // Don't trigger if user is typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) {
+        if (e.key === 'Escape') {
+          this.budgetModal.close();
+        }
+        return;
+      }
+
+      if (e.key === 'b' || e.key === 'B') {
+        sounds.playClick();
+        this.budgetModal.toggle();
+      } else if (e.key === 'Escape') {
+        if (this.budgetModal.isOpen()) {
+          sounds.playClick();
+          this.budgetModal.close();
+        } else {
+          sounds.playClick();
+          this.selectTool('inspect');
+        }
+      } else if (e.key === '1') {
+        sounds.playClick();
+        this.setSpeed(1);
+      } else if (e.key === '2') {
+        sounds.playClick();
+        this.setSpeed(2);
+      } else if (e.key === '3') {
+        sounds.playClick();
+        this.setSpeed(5);
+      } else if (e.key === ' ') {
+        e.preventDefault();
+        sounds.playClick();
+        this.setSpeed(this.engine.speed === 0 ? 1 : 0);
+      }
+    });
+  }
+
+  public selectTool(toolName: string) {
+    this.toolButtons.forEach(btn => {
+      if (btn.dataset.tool === toolName) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+    this.activeTool = toolName;
+    if (this.onToolChange) {
+      this.onToolChange(this.activeTool);
+    }
+  }
+
+  public setSpeed(speed: number) {
+    this.speedButtons.forEach(btn => {
+      if (parseInt(btn.dataset.speed || '1', 10) === speed) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+    this.engine.setSpeed(speed);
   }
 
   public updateStats() {

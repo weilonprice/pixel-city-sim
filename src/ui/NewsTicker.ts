@@ -1,0 +1,193 @@
+import { SimulationEngine } from '../simulation/SimulationEngine.ts';
+import { sounds } from '../core/SoundEffects.ts';
+
+export class NewsTicker {
+  private engine: SimulationEngine;
+  private tickerEl: HTMLElement;
+  private textEl: HTMLElement;
+  private currentHeadlineIndex: number = 0;
+  private rotationTimer: number | null = null;
+  private currentEmergency: string | null = null;
+  private emergencyTimer: number | null = null;
+
+  private humorHeadlines: string[] = [
+    "SimCity Times: Local llama population reaches record high in central park.",
+    "Mayor caught playing city simulator during municipal council session.",
+    "Local meteorologist predicts 90% chance of isometric sunshine.",
+    "Scientists confirm the world is rendered on a crisp 45-degree angle.",
+    "Traffic helicopter pilot reports no gridlock: 'Just enjoying the pixel scenery.'",
+    "Corner Diner waitress awarded Citizen of the Month for world-class cherry pie.",
+    "Pigeon congress convenes on city hall roof, issues demands for more breadcrumbs.",
+    "Citizens overwhelmingly approve of municipal tree planting initiatives.",
+    "Local inventor unveils steam-powered lawn mower; city fire chief watches nervously.",
+    "Archaeologists unearth ancient floppy disk beneath highway interchange.",
+    "Poll: 87% of residents prefer paved roads over dirt paths.",
+    "City library introduces late fee forgiveness in exchange for pixel art donations.",
+    "Mystery solved: The missing construction cones were used as festive party hats.",
+    "Bakers Guild reports nationwide shortage of doughnut sprinkles."
+  ];
+
+  constructor(engine: SimulationEngine, tickerEl: HTMLElement, textEl: HTMLElement) {
+    this.engine = engine;
+    this.tickerEl = tickerEl;
+    this.textEl = textEl;
+
+    this.bindEvents();
+    this.startRotation();
+    this.updateHeadline();
+  }
+
+  private bindEvents() {
+    this.tickerEl.addEventListener('click', () => {
+      sounds.playClick();
+      this.cycleNext();
+    });
+  }
+
+  public triggerEmergency(msg: string) {
+    this.currentEmergency = msg;
+    this.updateHeadline(true);
+
+    if (this.emergencyTimer) {
+      window.clearTimeout(this.emergencyTimer);
+    }
+
+    // Keep emergency headline for 12 seconds
+    this.emergencyTimer = window.setTimeout(() => {
+      this.currentEmergency = null;
+      this.updateHeadline();
+    }, 12000);
+  }
+
+  private startRotation() {
+    if (this.rotationTimer) {
+      window.clearInterval(this.rotationTimer);
+    }
+    // Rotate headlines every 9 seconds
+    this.rotationTimer = window.setInterval(() => {
+      if (!this.currentEmergency) {
+        this.currentHeadlineIndex++;
+        this.updateHeadline();
+      }
+    }, 9000);
+  }
+
+  public cycleNext() {
+    this.currentEmergency = null;
+    this.currentHeadlineIndex++;
+    this.updateHeadline();
+  }
+
+  private generateHeadlines(): string[] {
+    const list: string[] = [];
+
+    // 1. Emergency & Utility Headlines
+    let firesCount = 0;
+    let unpoweredCount = 0;
+    let unwateredCount = 0;
+    let disconnectedCount = 0;
+
+    const size = this.engine.grid.size;
+    for (let x = 0; x < size; x++) {
+      for (let y = 0; y < size; y++) {
+        const t = this.engine.grid.tiles[x][y];
+        if (t.building) {
+          if (t.building.onFire) firesCount++;
+          if (!t.building.powered) unpoweredCount++;
+          if (!t.building.watered) unwateredCount++;
+          if (!t.building.hasHighwayAccess) disconnectedCount++;
+        }
+      }
+    }
+
+    if (firesCount > 0) {
+      list.push(`🚨 EMERGENCY: ${firesCount} active fire${firesCount > 1 ? 's' : ''} raging! Fire department response requested!`);
+    }
+
+    if (disconnectedCount > 0) {
+      list.push("⚠️ HIGHWAY ALERT: Citizens unable to commute without roads connected to Interstate 10!");
+    }
+
+    if (unpoweredCount > 5) {
+      list.push(`⚡ ROLLING BLACKOUTS: ${unpoweredCount} buildings without electricity! Build or connect Power Plants!`);
+    }
+
+    if (unwateredCount > 5) {
+      list.push(`💧 DRY TAPS: ${unwateredCount} buildings lack water service! Water pumps needed!`);
+    }
+
+    // 2. Budget & Tax Headlines
+    if (this.engine.funds < 0) {
+      list.push("📉 FISCAL CRISIS: City treasury is in deficit! Mayor urged to balance municipal budget!");
+    } else if (this.engine.funds > 50000) {
+      list.push("💰 CITY BOOMING: Municipal reserves overflow as treasury surpasses $50,000!");
+    }
+
+    if (this.engine.taxRateR > 13) {
+      list.push("😡 HIGH TAXES: Citizens protest residential tax hikes! Moving trucks spotted leaving town!");
+    } else if (this.engine.taxRateR < 7) {
+      list.push("🎉 TAX HAVEN: New families flock to the city attracted by low residential taxes!");
+    }
+
+    if (this.engine.taxRateC > 13) {
+      list.push("💼 CHAMBER OF COMMERCE: Steep commercial taxes choking local business profits!");
+    }
+
+    if (this.engine.taxRateI > 13) {
+      list.push("🏭 INDUSTRIAL PROTEST: Factory owners threaten regional relocation over high tax burdens!");
+    }
+
+    // 3. Department Funding Headlines
+    if (this.engine.fundingFire < 80) {
+      list.push("🔥 FIRE UNION WARNING: Budget cutbacks leave fire station response times dangerously slow!");
+    }
+    if (this.engine.fundingPolice < 80) {
+      list.push("🚓 CRIME WATCH: Police funding cuts spark citizen safety concerns in underpatrolled zones!");
+    }
+    if (this.engine.fundingRoads < 80) {
+      list.push("🚧 POTHOLE CRISIS: Motorists file formal complaints regarding neglected road maintenance!");
+    }
+    if (this.engine.fundingHealth >= 120) {
+      list.push("🏥 MEDICAL EXCELLENCE: Generous hospital funding boosts citizen wellness and longevity!");
+    }
+    if (this.engine.fundingEducation >= 120) {
+      list.push("🎓 HONOR ROLL: Local schools rank top in region following expanded education funding!");
+    }
+
+    // 4. Population & Growth Milestones
+    if (this.engine.population === 0) {
+      list.push("🏙️ Welcome Mayor! Zone residential areas and connect them to Interstate 10 to welcome your first citizens!");
+    } else if (this.engine.population < 100) {
+      list.push(`🏡 Pioneer settlement: Population stands at ${this.engine.population} eager residents.`);
+    } else if (this.engine.population < 500) {
+      list.push(`🏘️ Growing township: ${this.engine.population} citizens now call our city home!`);
+    } else {
+      list.push(`🌆 Bustling metropolis: Population reaches ${this.engine.population} with ${this.engine.totalJobs} active jobs!`);
+    }
+
+    // 5. Classic Humorous Headlines
+    list.push(...this.humorHeadlines);
+
+    return list;
+  }
+
+  public updateHeadline(isEmergency: boolean = false) {
+    let text = '';
+    if (isEmergency && this.currentEmergency) {
+      text = this.currentEmergency;
+      this.tickerEl.classList.add('emergency');
+    } else {
+      this.tickerEl.classList.remove('emergency');
+      const headlines = this.generateHeadlines();
+      const index = Math.abs(this.currentHeadlineIndex) % headlines.length;
+      text = headlines[index];
+    }
+
+    // Trigger smooth fade transition
+    this.textEl.style.opacity = '0';
+    setTimeout(() => {
+      this.textEl.textContent = text;
+      this.textEl.style.opacity = '1';
+    }, 150);
+  }
+}

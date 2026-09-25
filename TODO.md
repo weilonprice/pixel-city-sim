@@ -52,10 +52,10 @@ A prioritized development roadmap and feature checklist for expanding **Pixel Ci
 
 ## 💰 Priority 3: Economy, Budget & Management Dashboards
 
-- [ ] **Detailed Budget Sheet (Modal UI)**
-  - [ ] Independent tax sliders for Residential, Commercial, and Industrial zones ($0\%$ to $20\%$).
-  - [ ] Departmental funding sliders (Road Maintenance, Power, Water, Fire, Police, Health, Education).
-  - [ ] Municipal bonds & emergency loans with interest rates.
+- [x] **Detailed Budget Sheet (Modal UI)**
+  - [x] Independent tax sliders for Residential, Commercial, and Industrial zones ($0\%$ to $20\%$).
+  - [x] Departmental funding sliders (Road Maintenance, Power, Water, Fire, Police, Health, Education) with dynamic coverage scaling.
+  - [x] Itemized revenues, expenses, and projected monthly net cash flow.
 - [ ] **City Ordinances & Policies**
   - [ ] Smoke Detector Ordinance (lowers fire risk).
   - [ ] Free Public Transit (boosts bus/metro usage, reduces car traffic).
