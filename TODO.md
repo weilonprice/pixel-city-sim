@@ -80,5 +80,10 @@ A prioritized development roadmap and feature checklist for expanding **Pixel Ci
 - [x] **Save & Load System**
   - [x] Auto-saving to browser `LocalStorage` every 60 seconds.
   - [x] Manual 💾 **Save** and 📂 **Load** buttons in the top navigation bar.
+- [x] **Automated Playtest & Verification Suite**
+  - [x] End-to-end headless Chrome playtest runner (`scripts/playtest.ts` / `npm run playtest`).
+  - [x] Automated layout generation, road and highway connectivity verification, RCI zoning growth, and tax assertions.
+  - [x] Full visual verification and regression detection across all 7 heatmap overlays.
+  - [x] Deterministic save and cold-boot load verification.
 - [ ] **City Snapshot / Camera Tool**
   - [ ] One-click high-resolution screenshot export without UI clutter.
