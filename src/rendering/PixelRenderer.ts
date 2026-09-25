@@ -62,6 +62,18 @@ export class PixelRenderer {
     this.animFrame++;
     const { width, height } = this.ctx.canvas;
 
+    // Camera screen shake update (for earthquakes, meteors, explosions)
+    this.camera.updateShake();
+    if (this.engine.activeEarthquakes.length > 0) {
+      this.camera.shake(5, 4);
+    }
+    if (this.engine.activeTornadoes.length > 0) {
+      this.camera.shake(2, 4);
+    }
+    if (this.engine.activeMeteors.some(m => m.exploded && m.explosionLife > 15)) {
+      this.camera.shake(8, 4);
+    }
+
     // Background color
     this.ctx.fillStyle = '#14141e';
     this.ctx.fillRect(0, 0, width, height);
@@ -95,6 +107,9 @@ export class PixelRenderer {
 
     // Render fire & smoke particles
     this.updateAndRenderParticles();
+
+    // Render Natural Disasters (Tornadoes, Earthquakes, Meteors)
+    this.renderDisasters();
 
     // Apply Day / Night lighting atmosphere & glowing street lights
     this.applyDayNightLighting(width, height);
@@ -153,6 +168,9 @@ export class PixelRenderer {
       } else {
         this.drawRoadTile(sx, sy, halfW, halfH, tile.roadMask, tile.connectedToHighway, tile.type);
       }
+      if (tile.damaged) {
+        this.drawDamagedRoadOverlay(sx, sy, halfW, halfH);
+      }
     }
 
     // 5. Render Structures & Municipal Services
@@ -184,6 +202,11 @@ export class PixelRenderer {
       this.drawTrainStation(sx, sy, halfW, halfH);
     } else if (tile.type === TileType.TRAIN_TRACK) {
       this.drawTrainTrack(sx, sy, halfW, halfH, tile);
+      if (tile.damaged) {
+        this.drawDamagedRoadOverlay(sx, sy, halfW, halfH);
+      }
+    } else if (tile.isRubble) {
+      this.drawRubble(sx, sy, halfW, halfH);
     } else if (tile.building) {
       this.drawBuilding(sx, sy, halfW, halfH, tile);
     }
@@ -3194,5 +3217,264 @@ export class PixelRenderer {
         sounds.playThunder();
       }
     }
+  }
+
+  /**
+   * Fractured / Cracked road overlay after earthquakes
+   */
+  private drawDamagedRoadOverlay(sx: number, sy: number, hw: number, hh: number) {
+    const ctx = this.ctx;
+    const z = this.camera.zoom;
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = Math.max(1, 1.5 * z);
+
+    // Jagged asphalt crack fissure
+    ctx.beginPath();
+    ctx.moveTo(sx - hw * 0.4, sy - hh * 0.2);
+    ctx.lineTo(sx - hw * 0.1, sy + hh * 0.1);
+    ctx.lineTo(sx + hw * 0.1, sy - hh * 0.1);
+    ctx.lineTo(sx + hw * 0.45, sy + hh * 0.3);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#334155';
+    ctx.beginPath();
+    ctx.moveTo(sx - hw * 0.1, sy + hh * 0.1);
+    ctx.lineTo(sx - hw * 0.2, sy + hh * 0.35);
+    ctx.stroke();
+
+    // Broken asphalt chunks
+    ctx.fillStyle = '#475569';
+    ctx.fillRect(sx - 3 * z, sy - 2 * z, 3 * z, 2 * z);
+    ctx.fillRect(sx + 5 * z, sy + 3 * z, 2.5 * z, 2 * z);
+  }
+
+  /**
+   * Scorched disaster ruins, debris, and smoking rubble pile
+   */
+  private drawRubble(sx: number, sy: number, hw: number, hh: number) {
+    const ctx = this.ctx;
+    const z = this.camera.zoom;
+
+    // 1. Scorched ground base polygon
+    ctx.fillStyle = '#1c1917';
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - hh * 0.75);
+    ctx.lineTo(sx + hw * 0.75, sy);
+    ctx.lineTo(sx, sy + hh * 0.75);
+    ctx.lineTo(sx - hw * 0.75, sy);
+    ctx.closePath();
+    ctx.fill();
+
+    // 2. Concrete & charred masonry rubble chunks
+    const chunks = [
+      { dx: -8, dy: -4, w: 7, h: 5, color: '#44403c' },
+      { dx: 2, dy: -6, w: 9, h: 6, color: '#292524' },
+      { dx: -6, dy: 3, w: 8, h: 5, color: '#57534e' },
+      { dx: 4, dy: 2, w: 7, h: 4, color: '#78716c' },
+      { dx: -2, dy: -1, w: 10, h: 7, color: '#292524' }
+    ];
+
+    chunks.forEach(c => {
+      ctx.fillStyle = c.color;
+      ctx.fillRect(sx + c.dx * z, sy + c.dy * z, c.w * z, c.h * z);
+      ctx.strokeStyle = '#0c0a09';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(sx + c.dx * z, sy + c.dy * z, c.w * z, c.h * z);
+    });
+
+    // 3. Twisted steel rebar & broken metal beams
+    ctx.strokeStyle = '#7f1d1d';
+    ctx.lineWidth = Math.max(1, 1.5 * z);
+    ctx.beginPath();
+    ctx.moveTo(sx - 9 * z, sy + 2 * z);
+    ctx.lineTo(sx - 4 * z, sy - 8 * z);
+    ctx.lineTo(sx + 1 * z, sy - 5 * z);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#475569';
+    ctx.beginPath();
+    ctx.moveTo(sx + 8 * z, sy - 2 * z);
+    ctx.lineTo(sx + 2 * z, sy - 9 * z);
+    ctx.stroke();
+
+    // 4. Smoldering glowing embers
+    const emberGlow = (this.animFrame % 20 < 10);
+    if (emberGlow) {
+      ctx.fillStyle = '#f97316';
+      ctx.fillRect(sx - 2 * z, sy + 1 * z, 2 * z, 2 * z);
+      ctx.fillStyle = '#ef4444';
+      ctx.fillRect(sx + 3 * z, sy - 3 * z, 1.5 * z, 1.5 * z);
+    }
+
+    // 5. Rising wisps of smoke particles
+    if (this.animFrame % 15 === 0) {
+      this.particles.push({
+        x: sx + (Math.random() - 0.5) * 8 * z,
+        y: sy - 4 * z,
+        vx: (Math.random() - 0.5) * 0.2,
+        vy: -0.6 - Math.random() * 0.3,
+        life: 0,
+        maxLife: 40,
+        color: 'rgba(120, 113, 108, 0.5)',
+        size: 3 * z
+      });
+    }
+  }
+
+  /**
+   * Procedural Natural Disasters: Tornadoes, Earthquakes & Meteors
+   */
+  private renderDisasters() {
+    const ctx = this.ctx;
+    const z = this.camera.zoom;
+
+    // --- 1. EARTHQUAKE FAULT LINES & GROUND FISSURES ---
+    this.engine.activeEarthquakes.forEach(quake => {
+      quake.faultLines.forEach(line => {
+        const p1 = this.camera.worldToScreen(line.x1, line.y1);
+        const p2 = this.camera.worldToScreen(line.x2, line.y2);
+
+        // Draw jagged fissure
+        ctx.strokeStyle = '#0c0a09';
+        ctx.lineWidth = Math.max(2, 3.5 * z);
+        ctx.beginPath();
+        const segments = 6;
+        let lastX = p1.x;
+        let lastY = p1.y;
+        ctx.moveTo(lastX, lastY);
+
+        for (let i = 1; i <= segments; i++) {
+          const t = i / segments;
+          const targetX = p1.x + (p2.x - p1.x) * t;
+          const targetY = p1.y + (p2.y - p1.y) * t;
+          const jitterX = i === segments ? 0 : ((i % 2 === 0 ? 5 : -5) * z);
+          const jitterY = i === segments ? 0 : ((i % 2 === 0 ? -3 : 3) * z);
+          ctx.lineTo(targetX + jitterX, targetY + jitterY);
+          lastX = targetX + jitterX;
+          lastY = targetY + jitterY;
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = '#451a03';
+        ctx.lineWidth = Math.max(1, 1.5 * z);
+        ctx.stroke();
+      });
+    });
+
+    // --- 2. TORNADO CYCLONIC FUNNEL VORTEX ---
+    this.engine.activeTornadoes.forEach(tornado => {
+      const { x: tx, y: ty } = this.camera.worldToScreen(tornado.x, tornado.y);
+      const layers = 14;
+      const maxHeight = 160 * z;
+
+      // Base spinning ground dust cloud
+      ctx.fillStyle = 'rgba(68, 64, 60, 0.45)';
+      ctx.beginPath();
+      ctx.ellipse(tx, ty + 2 * z, 28 * z, 14 * z, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Draw swirling stacked rings widening towards the clouds
+      for (let l = 0; l < layers; l++) {
+        const frac = l / layers;
+        const ly = ty - frac * maxHeight;
+        const wobble = Math.sin(this.animFrame * 0.18 + l * 0.45) * (4 + l * 1.5) * z;
+        const ringX = tx + wobble;
+        const ringRadiusW = (9 + frac * frac * 62) * z;
+        const ringRadiusH = ringRadiusW * 0.42;
+
+        const shade = Math.floor(35 + frac * 40);
+        ctx.fillStyle = `rgba(${shade}, ${shade - 5}, ${shade - 10}, 0.72)`;
+        ctx.beginPath();
+        ctx.ellipse(ringX, ly, ringRadiusW, ringRadiusH, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = `rgba(18, 16, 15, 0.5)`;
+        ctx.lineWidth = Math.max(1, 1.5 * z);
+        ctx.stroke();
+      }
+
+      // Debris particles spinning around the vortex
+      const debrisCount = 18;
+      for (let d = 0; d < debrisCount; d++) {
+        const angle = tornado.rotation * 1.5 + (d * (Math.PI * 2 / debrisCount));
+        const dFrac = (d / debrisCount);
+        const dAlt = dFrac * maxHeight * 0.85;
+        const dRad = (14 + dFrac * 45) * z;
+        const wobble = Math.sin(this.animFrame * 0.18 + dFrac * 5) * 5 * z;
+        const px = tx + wobble + Math.cos(angle) * dRad;
+        const py = ty - dAlt + Math.sin(angle) * (dRad * 0.45);
+
+        ctx.fillStyle = d % 3 === 0 ? '#b91c1c' : (d % 2 === 0 ? '#44403c' : '#78716c');
+        ctx.fillRect(px - 1.5 * z, py - 1.5 * z, 3 * z, 3 * z);
+      }
+    });
+
+    // --- 3. METEOR STRIKE FIREBALL & DETONATION ---
+    this.engine.activeMeteors.forEach(meteor => {
+      if (!meteor.exploded) {
+        const { x: sx, y: sy } = this.camera.worldToScreen(meteor.currentX, meteor.currentY);
+        const fireY = sy - meteor.altitude * 1.8 * z;
+
+        // Flaming smoke trail
+        for (let t = 1; t <= 8; t++) {
+          const trailProgress = t / 8;
+          const trailX = sx - trailProgress * 30 * z;
+          const trailY = fireY - trailProgress * 45 * z;
+          const trailR = (7 - trailProgress * 4) * z;
+          ctx.fillStyle = `rgba(234, 88, 12, ${0.8 - trailProgress * 0.6})`;
+          ctx.beginPath();
+          ctx.arc(trailX, trailY, trailR, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Blazing fireball core
+        ctx.fillStyle = '#f97316';
+        ctx.beginPath();
+        ctx.arc(sx, fireY, 8 * z, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#fef08a';
+        ctx.beginPath();
+        ctx.arc(sx, fireY, 5 * z, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(sx, fireY, 2.5 * z, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // Exploding shockwave and impact crater
+        const { x: ex, y: ey } = this.camera.worldToScreen(meteor.targetX, meteor.targetY);
+        const blastProgress = 1 - (meteor.explosionLife / 40);
+
+        // Scorched crater
+        ctx.fillStyle = '#0c0a09';
+        ctx.beginPath();
+        ctx.ellipse(ex, ey, 24 * z, 12 * z, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Expanding fiery shockwave ring
+        const shockRadius = blastProgress * meteor.blastRadius * 38 * z;
+        ctx.strokeStyle = `rgba(249, 115, 22, ${Math.max(0, 1 - blastProgress)})`;
+        ctx.lineWidth = Math.max(2, 4 * z);
+        ctx.beginPath();
+        ctx.ellipse(ex, ey, shockRadius, shockRadius * 0.5, 0, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Expanding explosion fireball dome
+        if (blastProgress < 0.7) {
+          const fireRad = Math.sin(blastProgress * Math.PI) * 35 * z;
+          ctx.fillStyle = 'rgba(239, 68, 68, 0.75)';
+          ctx.beginPath();
+          ctx.arc(ex, ey - fireRad * 0.6, fireRad, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = 'rgba(253, 224, 71, 0.85)';
+          ctx.beginPath();
+          ctx.arc(ex, ey - fireRad * 0.6, fireRad * 0.6, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    });
   }
 }

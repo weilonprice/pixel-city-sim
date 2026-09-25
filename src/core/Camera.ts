@@ -31,6 +31,37 @@ export class Camera {
     this.y = viewportHeight / 2 - isoY * this.zoom;
   }
 
+  public shakeIntensity: number = 0;
+  public shakeDuration: number = 0;
+  public shakeOffsetX: number = 0;
+  public shakeOffsetY: number = 0;
+
+  /**
+   * Trigger screen shake for earthquakes, explosions, and impacts
+   */
+  public shake(intensity: number, durationFrames: number) {
+    this.shakeIntensity = Math.max(this.shakeIntensity, intensity);
+    this.shakeDuration = Math.max(this.shakeDuration, durationFrames);
+  }
+
+  public updateShake() {
+    if (this.shakeDuration > 0) {
+      this.shakeDuration--;
+      const decay = this.shakeDuration / 60; // decay factor
+      const currentIntensity = this.shakeIntensity * Math.min(1, decay);
+      this.shakeOffsetX = (Math.random() - 0.5) * 2 * currentIntensity;
+      this.shakeOffsetY = (Math.random() - 0.5) * 2 * currentIntensity;
+      if (this.shakeDuration === 0) {
+        this.shakeIntensity = 0;
+        this.shakeOffsetX = 0;
+        this.shakeOffsetY = 0;
+      }
+    } else {
+      this.shakeOffsetX = 0;
+      this.shakeOffsetY = 0;
+    }
+  }
+
   /**
    * Convert isometric grid coordinates (gridX, gridY) to screen pixel coordinates
    */
@@ -41,8 +72,8 @@ export class Camera {
     const isoY = (gridX + gridY) * halfH - elevation * 12;
 
     return {
-      x: this.x + isoX * this.zoom,
-      y: this.y + isoY * this.zoom
+      x: this.x + this.shakeOffsetX + isoX * this.zoom,
+      y: this.y + this.shakeOffsetY + isoY * this.zoom
     };
   }
 
@@ -53,8 +84,8 @@ export class Camera {
     const halfW = TILE_WIDTH / 2;
     const halfH = TILE_HEIGHT / 2;
 
-    const unscaledX = (screenX - this.x) / this.zoom;
-    const unscaledY = (screenY - this.y) / this.zoom;
+    const unscaledX = (screenX - (this.x + this.shakeOffsetX)) / this.zoom;
+    const unscaledY = (screenY - (this.y + this.shakeOffsetY)) / this.zoom;
 
     const gridX = Math.floor((unscaledY / halfH + unscaledX / halfW) / 2);
     const gridY = Math.floor((unscaledY / halfH - unscaledX / halfW) / 2);

@@ -134,6 +134,60 @@ export class Grid {
     return neighbors;
   }
 
+  /**
+   * Demolishes or crushes a tile into disaster rubble
+   */
+  public demolishTileToRubble(x: number, y: number): boolean {
+    const tile = this.getTile(x, y);
+    if (!tile) return false;
+
+    // Never destroy Interstate 10 regional highway
+    if (tile.type === TileType.HIGHWAY) return false;
+
+    // If it has a building or is a civic structure
+    if (tile.building || tile.type === TileType.POWER_PLANT || tile.type === TileType.WATER_PUMP || 
+        tile.type === TileType.FIRE_STATION || tile.type === TileType.POLICE_STATION || 
+        tile.type === TileType.HOSPITAL || tile.type === TileType.SCHOOL || 
+        tile.type === TileType.BUS_DEPOT || tile.type === TileType.BUS_STOP ||
+        tile.type === TileType.TRAIN_STATION || tile.type === TileType.MAYORS_MANSION ||
+        tile.type === TileType.CITY_HALL || tile.type === TileType.GRAND_CENTRAL ||
+        tile.type === TileType.PARK) {
+      tile.building = undefined;
+      tile.zone = ZoneType.NONE;
+      tile.type = TileType.GRASS;
+      tile.isRubble = true;
+      tile.powered = false;
+      tile.watered = false;
+      return true;
+    }
+
+    // If it's a road or train track
+    if (isAnyRoad(tile.type) || tile.type === TileType.TRAIN_TRACK) {
+      tile.damaged = true;
+      tile.isRubble = true;
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Clears rubble from a tile, restoring clean ground
+   */
+  public clearRubble(x: number, y: number): boolean {
+    const tile = this.getTile(x, y);
+    if (!tile || (!tile.isRubble && !tile.damaged)) return false;
+
+    tile.isRubble = false;
+    tile.damaged = false;
+    if (tile.type !== TileType.WATER) {
+      if (!isAnyRoad(tile.type) && tile.type !== TileType.TRAIN_TRACK) {
+        tile.type = TileType.GRASS;
+      }
+    }
+    return true;
+  }
+
   public updateRoadMask(x: number, y: number) {
     const tile = this.getTile(x, y);
     if (!tile) return;

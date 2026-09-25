@@ -26,6 +26,17 @@ window.addEventListener('DOMContentLoaded', () => {
   const snapshotTool = new SnapshotTool(canvas, engine, (msg) => hud.showToast(msg));
   hud.snapshotTool = snapshotTool;
 
+  // Screen shake on disaster start
+  engine.onDisasterStarted = (type) => {
+    if (type === 'EARTHQUAKE') {
+      camera.shake(12, 90);
+    } else if (type === 'METEOR') {
+      camera.shake(8, 45);
+    } else if (type === 'TORNADO') {
+      camera.shake(5, 45);
+    }
+  };
+
   // Initialize soundscape on first interaction
   const initAudioOnFirstGesture = () => {
     sounds.initCtx();
@@ -92,7 +103,9 @@ window.addEventListener('DOMContentLoaded', () => {
       hoverCoordsEl.textContent = `Tile: (${gridX}, ${gridY}) • Val:$${tile.landValue}`;
 
       let desc = 'Grassland';
-      if (tile.type === TileType.WATER) desc = 'River / Deep Water';
+      if (tile.isRubble) desc = '🏚️ Ruins & Rubble (Use Demolish tool or Emergency Cleanup to clear)';
+      else if (tile.damaged) desc = '🚧 Fractured Roadway (Demolish to clear or use Cleanup)';
+      else if (tile.type === TileType.WATER) desc = 'River / Deep Water';
       else if (tile.type === TileType.HIGHWAY) desc = 'Interstate 10 (Regional Freeway Connection)';
       else if (tile.type === TileType.DIRT_ROAD) {
         const roadType = tile.isBridge ? 'Timber Trestle Bridge' : 'Country Dirt Road';
@@ -284,13 +297,15 @@ window.addEventListener('DOMContentLoaded', () => {
         tile.elevation = -1;
         tile.isBridge = false;
         tile.building = undefined;
+        tile.isRubble = false;
+        tile.damaged = false;
         grid.updateRoadAndNeighbors(x, y);
         engine.updateUtilities();
         grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation, engine.fundingTransit, engine.ordinances);
         return;
       }
 
-      if (tile.type !== TileType.GRASS || tile.zone !== ZoneType.NONE || tile.building) {
+      if (tile.type !== TileType.GRASS || tile.zone !== ZoneType.NONE || tile.building || tile.isRubble || tile.damaged) {
         if (engine.funds < COSTS.DEMOLISH) {
           sounds.playError();
           hud.showToast("Not enough funds to bulldoze!");
@@ -302,6 +317,8 @@ window.addEventListener('DOMContentLoaded', () => {
         tile.type = TileType.GRASS;
         tile.zone = ZoneType.NONE;
         tile.building = undefined;
+        tile.isRubble = false;
+        tile.damaged = false;
         grid.updateRoadAndNeighbors(x, y);
         engine.updateUtilities();
         engine.updateRewardMetrics();
