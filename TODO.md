@@ -56,10 +56,12 @@ A prioritized development roadmap and feature checklist for expanding **Pixel Ci
   - [x] Independent tax sliders for Residential, Commercial, and Industrial zones ($0\%$ to $20\%$).
   - [x] Departmental funding sliders (Road Maintenance, Power, Water, Fire, Police, Health, Education) with dynamic coverage scaling.
   - [x] Itemized revenues, expenses, and projected monthly net cash flow.
-- [ ] **City Ordinances & Policies**
-  - [ ] Smoke Detector Ordinance (lowers fire risk).
-  - [ ] Free Public Transit (boosts bus/metro usage, reduces car traffic).
-  - [ ] Clean Energy Tax Credits (encourages solar/wind, penalizes heavy polluters).
+- [x] **City Ordinances & Policies**
+  - [x] Smoke Detector Ordinance (reduces fire risk by 60%).
+  - [x] Free Public Transit (boosts commercial & residential demand, cuts road upkeep by 15%).
+  - [x] Clean Air & Smog Scrubbers (cuts power plant pollution spread by 40%).
+  - [x] Neighborhood Watch Patrols (cuts residential petty crime by 35%).
+  - [x] Pro-Reading Literacy Campaign (boosts school education coverage radius by 25%).
 
 ---
 
@@ -68,10 +70,11 @@ A prioritized development roadmap and feature checklist for expanding **Pixel Ci
 - [x] **Day / Night Cycle & Dynamic Lighting**
   - [x] 24-hour simulation day-night clock with real-time hours and minutes.
   - [x] Golden hour sunrise tinting, orange/purple sunset, and deep midnight blue atmosphere.
-- [ ] **Dynamic Weather & Seasons**
-  - [ ] Gentle pixel rain with puddle ripples.
-  - [ ] Thunderstorms with flash lightning and thunder audio.
-  - [ ] Winter snow dustings on rooftops.
+- [x] **Dynamic Weather & Seasons**
+  - [x] 4-stage procedural weather cycle: Clear, Overcast, Rain, and Thunderstorms.
+  - [x] Multi-layer precipitation particle streaks with wind drift and atmospheric lighting.
+  - [x] Severe Thunderstorms with full-screen lightning flash illumination and procedural synth thunder audio.
+  - [x] Interactive weather status badge in the top bar with click-to-cycle control.
 - [x] **Audio SFX & Dynamic Ambient Soundscape**
   - [x] 16-bit Web Audio synth build clicks, demolition crunches, coins, camera shutters, and error buzzers.
   - [x] Dynamic ambient soundscape: breeze/nature loop, traffic hum scaled with population, industrial hum, emergency sirens, and nighttime crickets.
