@@ -3,6 +3,7 @@ import { sounds } from '../core/SoundEffects.ts';
 import { OverlayMode } from '../core/Constants.ts';
 import { BudgetModal } from './BudgetModal.ts';
 import { NewsTicker } from './NewsTicker.ts';
+import { SnapshotTool } from './SnapshotTool.ts';
 
 export class HUD {
   private engine: SimulationEngine;
@@ -11,11 +12,14 @@ export class HUD {
   // Sub-components
   public budgetModal: BudgetModal;
   public newsTicker: NewsTicker;
+  public snapshotTool?: SnapshotTool;
 
   // DOM Elements
   private fundsEl: HTMLElement;
   private fundsBadgeEl: HTMLElement;
   private budgetBtn: HTMLButtonElement;
+  private snapshotBtn: HTMLButtonElement;
+  private muteBtn: HTMLButtonElement;
   private popEl: HTMLElement;
   private dateEl: HTMLElement;
   private rciREl: HTMLElement;
@@ -37,6 +41,8 @@ export class HUD {
     this.fundsEl = document.getElementById('funds-value')!;
     this.fundsBadgeEl = document.getElementById('stat-funds')!;
     this.budgetBtn = document.getElementById('btn-budget') as HTMLButtonElement;
+    this.snapshotBtn = document.getElementById('btn-snapshot') as HTMLButtonElement;
+    this.muteBtn = document.getElementById('btn-audio-mute') as HTMLButtonElement;
     this.popEl = document.getElementById('pop-value')!;
     this.dateEl = document.getElementById('date-value')!;
     this.rciREl = document.getElementById('rci-r-fill')!;
@@ -124,6 +130,32 @@ export class HUD {
     if (this.fundsBadgeEl) {
       this.fundsBadgeEl.addEventListener('click', openBudget);
     }
+
+    // Audio Mute Toggle
+    const updateMuteBtnUI = () => {
+      if (this.muteBtn) {
+        this.muteBtn.textContent = sounds.getIsMuted() ? '🔇' : '🔊';
+        this.muteBtn.title = sounds.getIsMuted() ? 'Unmute Sound [M]' : 'Mute Sound [M]';
+      }
+    };
+    updateMuteBtnUI();
+
+    if (this.muteBtn) {
+      this.muteBtn.addEventListener('click', () => {
+        sounds.toggleMute();
+        updateMuteBtnUI();
+        this.showToast(sounds.getIsMuted() ? '🔇 Audio muted' : '🔊 Audio unmuted');
+      });
+    }
+
+    // Snapshot Photo Button
+    if (this.snapshotBtn) {
+      this.snapshotBtn.addEventListener('click', () => {
+        if (this.snapshotTool) {
+          this.snapshotTool.takeSnapshot();
+        }
+      });
+    }
   }
 
   private setupKeyboardShortcuts() {
@@ -139,6 +171,17 @@ export class HUD {
       if (e.key === 'b' || e.key === 'B') {
         sounds.playClick();
         this.budgetModal.toggle();
+      } else if (e.key === 'm' || e.key === 'M') {
+        sounds.toggleMute();
+        if (this.muteBtn) {
+          this.muteBtn.textContent = sounds.getIsMuted() ? '🔇' : '🔊';
+          this.muteBtn.title = sounds.getIsMuted() ? 'Unmute Sound [M]' : 'Mute Sound [M]';
+        }
+        this.showToast(sounds.getIsMuted() ? '🔇 Audio muted' : '🔊 Audio unmuted');
+      } else if (e.key === 'p' || e.key === 'P') {
+        if (this.snapshotTool) {
+          this.snapshotTool.takeSnapshot();
+        }
       } else if (e.key === 'Escape') {
         if (this.budgetModal.isOpen()) {
           sounds.playClick();

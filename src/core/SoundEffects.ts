@@ -1,25 +1,78 @@
 /**
- * Web Audio API synthesizer for retro 16-bit sound effects.
+ * Web Audio API synthesizer for retro 16-bit sound effects and dynamic procedural soundscape.
  */
 class SoundManager {
   private ctx: AudioContext | null = null;
+  private masterGain: GainNode | null = null;
   private isMuted: boolean = false;
 
-  private initCtx() {
+  // Ambient soundscape nodes
+  private ambientStarted: boolean = false;
+  private breezeGain: GainNode | null = null;
+  private trafficGain: GainNode | null = null;
+  private industryGain: GainNode | null = null;
+
+  // Last event timestamps for procedural ambiance
+  private lastHornTime: number = 0;
+  private lastCricketTime: number = 0;
+  private lastSirenTime: number = 0;
+
+  constructor() {
+    // Check saved mute state from LocalStorage
+    try {
+      const savedMute = localStorage.getItem('pixel_city_sim_audio_muted');
+      if (savedMute !== null) {
+        this.isMuted = savedMute === 'true';
+      }
+    } catch {
+      // LocalStorage access fallback
+    }
+  }
+
+  public initCtx() {
     if (!this.ctx) {
       const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       this.ctx = new AudioCtxClass();
+
+      this.masterGain = this.ctx.createGain();
+      this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : 1, this.ctx.currentTime);
+      this.masterGain.connect(this.ctx.destination);
     }
     if (this.ctx.state === 'suspended') {
       this.ctx.resume();
     }
   }
 
+  public getIsMuted(): boolean {
+    return this.isMuted;
+  }
+
+  public setMuted(muted: boolean): boolean {
+    this.isMuted = muted;
+    try {
+      localStorage.setItem('pixel_city_sim_audio_muted', this.isMuted.toString());
+    } catch {
+      // Fallback
+    }
+
+    if (this.masterGain && this.ctx) {
+      this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : 1, this.ctx.currentTime);
+    }
+    return this.isMuted;
+  }
+
+  public toggleMute(): boolean {
+    this.initCtx();
+    return this.setMuted(!this.isMuted);
+  }
+
+  // --- ONE-SHOT PROCEDURAL SFX ---
+
   // Click / Select sound
-  playClick() {
+  public playClick() {
     if (this.isMuted) return;
     this.initCtx();
-    if (!this.ctx) return;
+    if (!this.ctx || !this.masterGain) return;
 
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
@@ -32,17 +85,17 @@ class SoundManager {
     gain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
 
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.masterGain);
 
     osc.start();
     osc.stop(this.ctx.currentTime + 0.04);
   }
 
   // Build / Placement sound (crisp retro wooden/thud click)
-  playBuild() {
+  public playBuild() {
     if (this.isMuted) return;
     this.initCtx();
-    if (!this.ctx) return;
+    if (!this.ctx || !this.masterGain) return;
 
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
@@ -55,17 +108,17 @@ class SoundManager {
     gain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
 
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.masterGain);
 
     osc.start();
     osc.stop(this.ctx.currentTime + 0.08);
   }
 
   // Demolish / Bulldoze sound (crunchy low rumble)
-  playDemolish() {
+  public playDemolish() {
     if (this.isMuted) return;
     this.initCtx();
-    if (!this.ctx) return;
+    if (!this.ctx || !this.masterGain) return;
 
     const bufferSize = this.ctx.sampleRate * 0.12;
     const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
@@ -88,16 +141,16 @@ class SoundManager {
 
     noise.connect(filter);
     filter.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.masterGain);
 
     noise.start();
   }
 
   // Error / Cannot build sound (low buzz)
-  playError() {
+  public playError() {
     if (this.isMuted) return;
     this.initCtx();
-    if (!this.ctx) return;
+    if (!this.ctx || !this.masterGain) return;
 
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
@@ -110,17 +163,17 @@ class SoundManager {
     gain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.15);
 
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.masterGain);
 
     osc.start();
     osc.stop(this.ctx.currentTime + 0.15);
   }
 
   // Cash / Coin collect chime (high two-tone chime)
-  playCoin() {
+  public playCoin() {
     if (this.isMuted) return;
     this.initCtx();
-    if (!this.ctx) return;
+    if (!this.ctx || !this.masterGain) return;
 
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
@@ -133,10 +186,232 @@ class SoundManager {
     gain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.25);
 
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.masterGain);
 
     osc.start();
     osc.stop(this.ctx.currentTime + 0.25);
+  }
+
+  // Camera Snapshot shutter click ("ka-click")
+  public playCameraShutter() {
+    if (this.isMuted) return;
+    this.initCtx();
+    if (!this.ctx || !this.masterGain) return;
+
+    // First click: high tick
+    const osc1 = this.ctx.createOscillator();
+    const gain1 = this.ctx.createGain();
+    osc1.type = 'square';
+    osc1.frequency.setValueAtTime(1400, this.ctx.currentTime);
+    osc1.frequency.exponentialRampToValueAtTime(300, this.ctx.currentTime + 0.03);
+    gain1.gain.setValueAtTime(0.18, this.ctx.currentTime);
+    gain1.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.03);
+    osc1.connect(gain1);
+    gain1.connect(this.masterGain);
+    osc1.start();
+    osc1.stop(this.ctx.currentTime + 0.03);
+
+    // Second click: metallic shutter release 40ms later
+    setTimeout(() => {
+      if (!this.ctx || !this.masterGain) return;
+      const osc2 = this.ctx.createOscillator();
+      const gain2 = this.ctx.createGain();
+      osc2.type = 'triangle';
+      osc2.frequency.setValueAtTime(750, this.ctx.currentTime);
+      osc2.frequency.exponentialRampToValueAtTime(180, this.ctx.currentTime + 0.06);
+      gain2.gain.setValueAtTime(0.2, this.ctx.currentTime);
+      gain2.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.06);
+      osc2.connect(gain2);
+      gain2.connect(this.masterGain);
+      osc2.start();
+      osc2.stop(this.ctx.currentTime + 0.06);
+    }, 40);
+  }
+
+  // Car Horn ("beep-beep")
+  public playCarHorn() {
+    if (this.isMuted) return;
+    this.initCtx();
+    if (!this.ctx || !this.masterGain) return;
+
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(440, t); // A4
+    osc.frequency.setValueAtTime(554.37, t); // C#5
+
+    gain.gain.setValueAtTime(0.03, t);
+    gain.gain.setValueAtTime(0.001, t + 0.08);
+    gain.gain.setValueAtTime(0.03, t + 0.12);
+    gain.gain.linearRampToValueAtTime(0.001, t + 0.22);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+
+    osc.start(t);
+    osc.stop(t + 0.22);
+  }
+
+  // Emergency Siren wail
+  public playSiren() {
+    if (this.isMuted) return;
+    this.initCtx();
+    if (!this.ctx || !this.masterGain) return;
+
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(600, t);
+    osc.frequency.linearRampToValueAtTime(950, t + 0.4);
+    osc.frequency.linearRampToValueAtTime(600, t + 0.8);
+
+    gain.gain.setValueAtTime(0.04, t);
+    gain.gain.linearRampToValueAtTime(0.001, t + 0.85);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+
+    osc.start(t);
+    osc.stop(t + 0.85);
+  }
+
+  // Nighttime Cricket Chirp
+  public playNightCricket() {
+    if (this.isMuted) return;
+    this.initCtx();
+    if (!this.ctx || !this.masterGain) return;
+
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(4500, t);
+
+    // Rapid double pulse
+    gain.gain.setValueAtTime(0.02, t);
+    gain.gain.setValueAtTime(0.001, t + 0.03);
+    gain.gain.setValueAtTime(0.02, t + 0.05);
+    gain.gain.linearRampToValueAtTime(0.001, t + 0.09);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+
+    osc.start(t);
+    osc.stop(t + 0.09);
+  }
+
+  // --- DYNAMIC AMBIENT SOUNDSCAPE ENGINE ---
+
+  public startAmbientLoop() {
+    if (this.ambientStarted) return;
+    this.initCtx();
+    if (!this.ctx || !this.masterGain) return;
+
+    this.ambientStarted = true;
+
+    // 1. Nature / Breeze Loop (filtered noise)
+    const breezeBufferSize = this.ctx.sampleRate * 2;
+    const breezeBuffer = this.ctx.createBuffer(1, breezeBufferSize, this.ctx.sampleRate);
+    const breezeData = breezeBuffer.getChannelData(0);
+    for (let i = 0; i < breezeBufferSize; i++) {
+      breezeData[i] = Math.random() * 2 - 1;
+    }
+
+    const breezeSource = this.ctx.createBufferSource();
+    breezeSource.buffer = breezeBuffer;
+    breezeSource.loop = true;
+
+    const breezeFilter = this.ctx.createBiquadFilter();
+    breezeFilter.type = 'lowpass';
+    breezeFilter.frequency.setValueAtTime(220, this.ctx.currentTime);
+
+    this.breezeGain = this.ctx.createGain();
+    this.breezeGain.gain.setValueAtTime(0.015, this.ctx.currentTime);
+
+    breezeSource.connect(breezeFilter);
+    breezeFilter.connect(this.breezeGain);
+    this.breezeGain.connect(this.masterGain);
+    breezeSource.start();
+
+    // 2. City Traffic Hum (lower frequency rumble)
+    const trafficSource = this.ctx.createBufferSource();
+    trafficSource.buffer = breezeBuffer;
+    trafficSource.loop = true;
+
+    const trafficFilter = this.ctx.createBiquadFilter();
+    trafficFilter.type = 'bandpass';
+    trafficFilter.frequency.setValueAtTime(120, this.ctx.currentTime);
+    trafficFilter.Q.setValueAtTime(2.0, this.ctx.currentTime);
+
+    this.trafficGain = this.ctx.createGain();
+    this.trafficGain.gain.setValueAtTime(0, this.ctx.currentTime);
+
+    trafficSource.connect(trafficFilter);
+    trafficFilter.connect(this.trafficGain);
+    this.trafficGain.connect(this.masterGain);
+    trafficSource.start();
+
+    // 3. Industrial Hum (low harmonic hum)
+    const indOsc = this.ctx.createOscillator();
+    indOsc.type = 'triangle';
+    indOsc.frequency.setValueAtTime(60, this.ctx.currentTime);
+
+    this.industryGain = this.ctx.createGain();
+    this.industryGain.gain.setValueAtTime(0, this.ctx.currentTime);
+
+    indOsc.connect(this.industryGain);
+    this.industryGain.connect(this.masterGain);
+    indOsc.start();
+  }
+
+  /**
+   * Updates ambient volumes based on real-time city state and time of day.
+   */
+  public updateAmbient(population: number, industrialJobs: number, gameHour: number, activeFires: number) {
+    if (!this.ambientStarted || !this.ctx) return;
+    const now = this.ctx.currentTime;
+
+    // Traffic volume scales with population (max 0.035)
+    const targetTraffic = Math.min(0.035, (population / 500) * 0.035);
+    if (this.trafficGain) {
+      this.trafficGain.gain.linearRampToValueAtTime(targetTraffic, now + 1.0);
+    }
+
+    // Industrial hum scales with factories
+    const targetIndustry = Math.min(0.025, (industrialJobs / 200) * 0.025);
+    if (this.industryGain) {
+      this.industryGain.gain.linearRampToValueAtTime(targetIndustry, now + 1.0);
+    }
+
+    // Breeze volume is slightly higher when city is small
+    const targetBreeze = population > 100 ? 0.008 : 0.016;
+    if (this.breezeGain) {
+      this.breezeGain.gain.linearRampToValueAtTime(targetBreeze, now + 1.0);
+    }
+
+    // Procedural Car Horn in populated cities (every ~12-18 seconds)
+    if (population >= 40 && now - this.lastHornTime > 14 && Math.random() < 0.25) {
+      this.lastHornTime = now;
+      this.playCarHorn();
+    }
+
+    // Procedural Siren when fires are active
+    if (activeFires > 0 && now - this.lastSirenTime > 10) {
+      this.lastSirenTime = now;
+      this.playSiren();
+    }
+
+    // Procedural Crickets at night (hours 21:00 to 05:00)
+    const isNight = gameHour >= 21 || gameHour <= 5;
+    if (isNight && now - this.lastCricketTime > 8 && Math.random() < 0.35) {
+      this.lastCricketTime = now;
+      this.playNightCricket();
+    }
   }
 }
 
