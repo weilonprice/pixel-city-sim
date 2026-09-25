@@ -29,7 +29,7 @@
     /* TOP STATUS BAR */
     #top-bar {
       height: 48px;
-      background: #2a2a38;
+      background: #242433;
       border-bottom: 3px solid #14141c;
       display: flex;
       align-items: center;
@@ -42,11 +42,11 @@
     .city-title-section {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 16px;
     }
 
     .city-title {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: bold;
       color: #ffd700;
       text-shadow: 2px 2px #000;
@@ -56,7 +56,7 @@
     .stats-group {
       display: flex;
       align-items: center;
-      gap: 20px;
+      gap: 14px;
     }
 
     .stat-badge {
@@ -64,10 +64,10 @@
       align-items: center;
       gap: 6px;
       background: #191924;
-      padding: 6px 12px;
+      padding: 5px 10px;
       border: 2px solid #3c3c52;
       border-radius: 4px;
-      font-size: 12px;
+      font-size: 11px;
     }
 
     .stat-badge.funds {
@@ -127,6 +127,40 @@
       line-height: 1;
     }
 
+    /* OVERLAY DROPDOWN */
+    .overlay-dropdown {
+      background: #1e1e2d;
+      color: #38bdf8;
+      border: 2px solid #475569;
+      padding: 4px 8px;
+      font-family: inherit;
+      font-size: 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .overlay-dropdown:hover {
+      border-color: #38bdf8;
+    }
+
+    /* UTILITY BUTTONS (Save / Load) */
+    .utility-btn {
+      background: #333346;
+      border: 2px solid #4f46e5;
+      color: #e0e7ff;
+      padding: 4px 8px;
+      font-family: inherit;
+      font-size: 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.1s ease;
+    }
+
+    .utility-btn:hover {
+      background: #4338ca;
+    }
+
     /* SPEED CONTROLS */
     .speed-controls {
       display: flex;
@@ -177,7 +211,7 @@
       position: absolute;
       bottom: 74px;
       left: 16px;
-      background: rgba(18, 18, 28, 0.9);
+      background: rgba(18, 18, 28, 0.92);
       border: 2px solid #4f46e5;
       padding: 8px 12px;
       font-size: 11px;
@@ -193,14 +227,15 @@
     /* BOTTOM TOOLBAR */
     #toolbar {
       height: 64px;
-      background: #242433;
+      background: #20202e;
       border-top: 3px solid #14141c;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
-      padding: 0 16px;
+      gap: 6px;
+      padding: 0 12px;
       z-index: 10;
+      overflow-x: auto;
     }
 
     .tool-btn {
@@ -208,23 +243,24 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: #323246;
-      border: 2px solid #4a4a66;
+      background: #2e2e40;
+      border: 2px solid #45455c;
       color: #d1d5db;
-      padding: 6px 12px;
-      height: 48px;
-      min-width: 60px;
+      padding: 4px 8px;
+      height: 50px;
+      min-width: 58px;
       cursor: pointer;
       font-family: inherit;
-      font-size: 9px;
+      font-size: 8px;
       border-radius: 4px;
       transition: all 0.1s ease;
-      gap: 3px;
+      gap: 2px;
+      flex-shrink: 0;
     }
 
     .tool-btn:hover {
-      background: #42425c;
-      border-color: #6a6a92;
+      background: #3e3e56;
+      border-color: #6366f1;
       transform: translateY(-2px);
     }
 
@@ -237,7 +273,7 @@
     }
 
     .tool-icon {
-      font-size: 16px;
+      font-size: 15px;
     }
 
     .tool-cost {
@@ -249,7 +285,7 @@
       color: #e0e7ff;
     }
 
-    /* MINI NOTIFICATION TOAST */
+    /* TOAST */
     #toast {
       position: absolute;
       top: 60px;
@@ -265,6 +301,7 @@
       opacity: 0;
       transition: opacity 0.3s ease;
       z-index: 20;
+      text-align: center;
     }
 
     #toast.show {
@@ -277,6 +314,21 @@
   <header id="top-bar">
     <div class="city-title-section">
       <span class="city-title">🏙️ PIXEL CITY</span>
+
+      <!-- Save & Load -->
+      <button class="utility-btn" id="btn-save" title="Save City to LocalStorage">💾 Save</button>
+      <button class="utility-btn" id="btn-load" title="Load City from LocalStorage">📂 Load</button>
+
+      <!-- Data Overlay Selector -->
+      <select id="overlay-select" class="overlay-dropdown" title="Select Data Overlay">
+        <option value="NORMAL">🌐 Normal View</option>
+        <option value="POWER">⚡ Power Grid</option>
+        <option value="WATER">💧 Water Grid</option>
+        <option value="FIRE">🔥 Fire Safety</option>
+        <option value="CRIME">🚨 Police / Crime</option>
+        <option value="LAND_VALUE">💰 Land Value</option>
+        <option value="POLLUTION">☣️ Pollution</option>
+      </select>
     </div>
 
     <div class="stats-group">
@@ -292,7 +344,7 @@
 
       <div class="stat-badge date" id="stat-date">
         <span>📅</span>
-        <span id="date-value">Jan 2000</span>
+        <span id="date-value">Jan 2000 • 12:00</span>
       </div>
 
       <!-- RCI Demand -->
@@ -330,7 +382,7 @@
       <div id="hover-desc">Grassland</div>
     </div>
 
-    <div id="toast">Welcome to Pixel City! Lay roads and zone areas to start.</div>
+    <div id="toast">Connect your roads to the Interstate 10 interchange to bring citizens in!</div>
   </main>
 
   <!-- BOTTOM TOOLBAR -->
@@ -362,12 +414,32 @@
     <button class="tool-btn" data-tool="power-plant">
       <span class="tool-icon">⚡</span>
       <span>Power</span>
-      <span class="tool-cost">$1,000</span>
+      <span class="tool-cost">$1k</span>
     </button>
     <button class="tool-btn" data-tool="water-pump">
       <span class="tool-icon">💧</span>
       <span>Water</span>
       <span class="tool-cost">$800</span>
+    </button>
+    <button class="tool-btn" data-tool="fire-station">
+      <span class="tool-icon">🚒</span>
+      <span>Fire</span>
+      <span class="tool-cost">$600</span>
+    </button>
+    <button class="tool-btn" data-tool="police-station">
+      <span class="tool-icon">🚓</span>
+      <span>Police</span>
+      <span class="tool-cost">$600</span>
+    </button>
+    <button class="tool-btn" data-tool="hospital">
+      <span class="tool-icon">🏥</span>
+      <span>Clinic</span>
+      <span class="tool-cost">$850</span>
+    </button>
+    <button class="tool-btn" data-tool="school">
+      <span class="tool-icon">🏫</span>
+      <span>School</span>
+      <span class="tool-cost">$500</span>
     </button>
     <button class="tool-btn" data-tool="park">
       <span class="tool-icon">🌳</span>

@@ -1,5 +1,6 @@
 import { SimulationEngine } from '../simulation/SimulationEngine.ts';
 import { sounds } from '../core/SoundEffects.ts';
+import { OverlayMode } from '../core/Constants.ts';
 
 export class HUD {
   private engine: SimulationEngine;
@@ -13,6 +14,9 @@ export class HUD {
   private rciCEl: HTMLElement;
   private rciIEl: HTMLElement;
   private toastEl: HTMLElement;
+  private overlaySelectEl: HTMLSelectElement;
+  private saveBtn: HTMLButtonElement;
+  private loadBtn: HTMLButtonElement;
   private toolButtons: NodeListOf<HTMLButtonElement>;
   private speedButtons: NodeListOf<HTMLButtonElement>;
 
@@ -29,13 +33,15 @@ export class HUD {
     this.rciCEl = document.getElementById('rci-c-fill')!;
     this.rciIEl = document.getElementById('rci-i-fill')!;
     this.toastEl = document.getElementById('toast')!;
+    this.overlaySelectEl = document.getElementById('overlay-select') as HTMLSelectElement;
+    this.saveBtn = document.getElementById('btn-save') as HTMLButtonElement;
+    this.loadBtn = document.getElementById('btn-load') as HTMLButtonElement;
     this.toolButtons = document.querySelectorAll('.tool-btn');
     this.speedButtons = document.querySelectorAll('.speed-btn');
 
     this.setupEventListeners();
     this.updateStats();
 
-    // Connect engine callback
     this.engine.onStatsUpdate = () => this.updateStats();
     this.engine.onNotification = (msg: string) => this.showToast(msg);
   }
@@ -65,6 +71,25 @@ export class HUD {
         this.engine.setSpeed(speed);
       });
     });
+
+    // Data Overlay Selector
+    this.overlaySelectEl.addEventListener('change', () => {
+      sounds.playClick();
+      const mode = this.overlaySelectEl.value as OverlayMode;
+      this.engine.setOverlayMode(mode);
+    });
+
+    // Save Button
+    this.saveBtn.addEventListener('click', () => {
+      sounds.playClick();
+      this.engine.saveToLocalStorage();
+    });
+
+    // Load Button
+    this.loadBtn.addEventListener('click', () => {
+      sounds.playClick();
+      this.engine.loadFromLocalStorage();
+    });
   }
 
   public updateStats() {
@@ -78,7 +103,6 @@ export class HUD {
     this.popEl.textContent = this.engine.population.toLocaleString();
     this.dateEl.textContent = this.engine.getDateString();
 
-    // RCI Bars (-100 to 100 mapped to 0% to 100% height)
     const mapDemand = (d: number) => `${Math.max(10, Math.min(100, (d + 100) / 2))}%`;
     this.rciREl.style.height = mapDemand(this.engine.demandR);
     this.rciCEl.style.height = mapDemand(this.engine.demandC);
@@ -90,6 +114,6 @@ export class HUD {
     this.toastEl.classList.add('show');
     setTimeout(() => {
       this.toastEl.classList.remove('show');
-    }, 3500);
+    }, 4000);
   }
 }

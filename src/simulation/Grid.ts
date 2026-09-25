@@ -10,16 +10,14 @@ export class Grid {
     this.initMap();
   }
 
-  private initMap() {
+  public initMap() {
     this.tiles = [];
 
-    // River running down the eastern portion of the 64x64 map
     const riverXCenter = Math.floor(this.size * 0.78);
 
     for (let x = 0; x < this.size; x++) {
       this.tiles[x] = [];
       for (let y = 0; y < this.size; y++) {
-        // Natural serpentine river curve
         const riverOffset = Math.sin(y / 6) * 4 + Math.cos(y / 12) * 2;
         const distToRiver = Math.abs(x - (riverXCenter + riverOffset));
 
@@ -41,15 +39,18 @@ export class Grid {
           powered: false,
           watered: false,
           connectedToHighway: false,
-          landValue: 10,
+          landValue: 20,
           pollution: 0,
+          crime: 0,
+          fireCoverage: 0,
+          policeCoverage: 0,
+          healthCoverage: 0,
+          educationCoverage: 0,
           variant: Math.floor(Math.random() * 4)
         };
       }
     }
 
-    // Build the pre-existing regional Interstate Highway (Interstate 10)
-    // Running East-West across y = 14 from border to border
     this.buildStarterInterstate();
   }
 
@@ -61,18 +62,15 @@ export class Grid {
       tile.type = TileType.HIGHWAY;
       tile.connectedToHighway = true;
       tile.zone = ZoneType.NONE;
-      // Over water it acts as a highway bridge
       if (tile.elevation < 0) {
-        tile.elevation = 0; // elevated over river
+        tile.elevation = 0;
+        tile.isBridge = true;
       }
     }
 
-    // Build Starter Off-Ramp / Diamond Interchange at x = 28 to 32
-    // Connecting Highway (y=14) to local stub road (y=16..18)
     const rampX1 = 28;
     const rampX2 = 32;
 
-    // Ramps merging off the highway
     this.tiles[rampX1][highwayY + 1].type = TileType.HIGHWAY;
     this.tiles[rampX1][highwayY + 1].isRamp = true;
     this.tiles[rampX1][highwayY + 1].connectedToHighway = true;
@@ -81,14 +79,12 @@ export class Grid {
     this.tiles[rampX2][highwayY + 1].isRamp = true;
     this.tiles[rampX2][highwayY + 1].connectedToHighway = true;
 
-    // Local road connector bridge between ramps
     for (let x = rampX1; x <= rampX2; x++) {
       const t = this.tiles[x][highwayY + 2];
       t.type = TileType.ROAD;
       t.connectedToHighway = true;
     }
 
-    // Starter Avenue / Boulevard stubs leading South into the city plot
     const entryRoadX = 30;
     for (let y = highwayY + 2; y <= highwayY + 5; y++) {
       const t = this.tiles[entryRoadX][y];
@@ -96,7 +92,6 @@ export class Grid {
       t.connectedToHighway = true;
     }
 
-    // Update road autotiling masks for pre-built roads
     for (let x = rampX1 - 1; x <= rampX2 + 1; x++) {
       for (let y = highwayY; y <= highwayY + 6; y++) {
         if (this.isValidCoord(x, y)) {
@@ -138,13 +133,6 @@ export class Grid {
     return neighbors;
   }
 
-  /**
-   * Recalculate 4-bit road autotiling bitmask:
-   * Bit 0 (1): North (x, y - 1)
-   * Bit 1 (2): East  (x + 1, y)
-   * Bit 2 (4): South (x, y + 1)
-   * Bit 3 (8): West  (x - 1, y)
-   */
   public updateRoadMask(x: number, y: number) {
     const tile = this.getTile(x, y);
     if (!tile || (tile.type !== TileType.ROAD && tile.type !== TileType.HIGHWAY)) return;
@@ -174,11 +162,7 @@ export class Grid {
     this.updateHighwayConnectivity();
   }
 
-  /**
-   * BFS to propagate Highway connectivity across all connected road networks
-   */
   public updateHighwayConnectivity() {
-    // Reset connectivity on all normal roads and buildings
     for (let x = 0; x < this.size; x++) {
       for (let y = 0; y < this.size; y++) {
         const t = this.tiles[x][y];
@@ -191,7 +175,6 @@ export class Grid {
       }
     }
 
-    // Seed BFS queue with all highway tiles
     const queue: Tile[] = [];
     for (let x = 0; x < this.size; x++) {
       for (let y = 0; y < this.size; y++) {
@@ -202,7 +185,6 @@ export class Grid {
       }
     }
 
-    // Traverse all connected roads
     while (queue.length > 0) {
       const curr = queue.shift()!;
       const neighbors = this.getNeighbors(curr.x, curr.y);
@@ -216,12 +198,113 @@ export class Grid {
       }
     }
 
-    // Now update highway access flag on buildings that border a highway-connected road
     for (let x = 0; x < this.size; x++) {
       for (let y = 0; y < this.size; y++) {
         const t = this.tiles[x][y];
         if (t.building) {
           t.building.hasHighwayAccess = this.isAdjacentToHighwayConnectedRoad(x, y);
+        }
+      }
+    }
+  }
+
+  /**
+   * Spatial coverage recalculation for all services & environmental heatmaps
+   */
+  public recalculateServiceCoverages() {
+    const size = this.size;
+
+    // Reset temporary layers
+    for (let x = 0; x < size; x++) {
+      for (let y = 0; y < size; y++) {
+        const t = this.tiles[x][y];
+        t.fireCoverage = 0;
+        t.policeCoverage = 0;
+        t.healthCoverage = 0;
+        t.educationCoverage = 0;
+        t.pollution = 0;
+        t.landValue = 25; // baseline land value
+      }
+    }
+
+    // Pass 1: Radii emissions from services and industrial emitters
+    for (let x = 0; x < size; x++) {
+      for (let y = 0; y < size; y++) {
+        const t = this.tiles[x][y];
+
+        // Fire Station Coverage (Radius 14)
+        if (t.type === TileType.FIRE_STATION && t.powered && t.watered) {
+          this.applyRadialEffect(x, y, 14, (target, dist) => {
+            target.fireCoverage = Math.max(target.fireCoverage, Math.round(100 * (1 - dist / 14)));
+          });
+        }
+
+        // Police Station Coverage (Radius 14)
+        if (t.type === TileType.POLICE_STATION && t.powered && t.watered) {
+          this.applyRadialEffect(x, y, 14, (target, dist) => {
+            target.policeCoverage = Math.max(target.policeCoverage, Math.round(100 * (1 - dist / 14)));
+          });
+        }
+
+        // Hospital / Clinic Coverage (Radius 16)
+        if (t.type === TileType.HOSPITAL && t.powered && t.watered) {
+          this.applyRadialEffect(x, y, 16, (target, dist) => {
+            target.healthCoverage = Math.max(target.healthCoverage, Math.round(100 * (1 - dist / 16)));
+            target.landValue += Math.round(15 * (1 - dist / 16));
+          });
+        }
+
+        // School Coverage (Radius 14)
+        if (t.type === TileType.SCHOOL && t.powered && t.watered) {
+          this.applyRadialEffect(x, y, 14, (target, dist) => {
+            target.educationCoverage = Math.max(target.educationCoverage, Math.round(100 * (1 - dist / 14)));
+            target.landValue += Math.round(12 * (1 - dist / 14));
+          });
+        }
+
+        // Parks (Radius 8)
+        if (t.type === TileType.PARK) {
+          this.applyRadialEffect(x, y, 8, (target, dist) => {
+            target.landValue += Math.round(30 * (1 - dist / 8));
+          });
+        }
+
+        // Pollution from Industrial Zones & Coal Power Plants (Radius 9)
+        if (t.type === TileType.POWER_PLANT || (t.building && t.building.zone === ZoneType.INDUSTRIAL)) {
+          const intensity = t.type === TileType.POWER_PLANT ? 70 : 45;
+          this.applyRadialEffect(x, y, 9, (target, dist) => {
+            target.pollution = Math.min(100, target.pollution + Math.round(intensity * (1 - dist / 9)));
+            target.landValue = Math.max(5, target.landValue - Math.round(25 * (1 - dist / 9)));
+          });
+        }
+      }
+    }
+
+    // Pass 2: Calculate crime based on police coverage and land value
+    for (let x = 0; x < size; x++) {
+      for (let y = 0; y < size; y++) {
+        const t = this.tiles[x][y];
+        if (t.building) {
+          const rawCrime = Math.max(0, 60 - t.policeCoverage - Math.floor(t.landValue / 4));
+          t.crime = Math.min(100, rawCrime);
+        } else {
+          t.crime = 0;
+        }
+      }
+    }
+  }
+
+  private applyRadialEffect(centerX: number, centerY: number, radius: number, fn: (tile: Tile, dist: number) => void) {
+    const minX = Math.max(0, centerX - radius);
+    const maxX = Math.min(this.size - 1, centerX + radius);
+    const minY = Math.max(0, centerY - radius);
+    const maxY = Math.min(this.size - 1, centerY + radius);
+
+    for (let x = minX; x <= maxX; x++) {
+      for (let y = minY; y <= maxY; y++) {
+        const dist = Math.hypot(x - centerX, y - centerY);
+        if (dist <= radius) {
+          fn(this.tiles[x][y], dist);
         }
       }
     }

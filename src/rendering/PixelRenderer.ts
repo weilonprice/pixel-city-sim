@@ -1,6 +1,7 @@
-import { TILE_WIDTH, TILE_HEIGHT, TileType, ZoneType, Tile } from '../core/Constants.ts';
+import { TILE_WIDTH, TILE_HEIGHT, TileType, ZoneType, Tile, OverlayMode } from '../core/Constants.ts';
 import { Camera } from '../core/Camera.ts';
 import { Grid } from '../simulation/Grid.ts';
+import { SimulationEngine } from '../simulation/SimulationEngine.ts';
 import { assetManager } from './AssetManager.ts';
 
 interface Particle {
@@ -23,31 +24,32 @@ interface Vehicle {
   color: string;
   speed: number;
   isTruck?: boolean;
+  isEmergency?: 'fire' | 'police';
 }
 
 export class PixelRenderer {
   private ctx: CanvasRenderingContext2D;
   private camera: Camera;
   private grid: Grid;
+  private engine: SimulationEngine;
   private animFrame: number = 0;
   private particles: Particle[] = [];
   private vehicles: Vehicle[] = [];
 
-  constructor(ctx: CanvasRenderingContext2D, camera: Camera, grid: Grid) {
+  constructor(ctx: CanvasRenderingContext2D, camera: Camera, grid: Grid, engine: SimulationEngine) {
     this.ctx = ctx;
     this.camera = camera;
     this.grid = grid;
+    this.engine = engine;
   }
 
   public render(hoverGridX: number, hoverGridY: number, activeTool: string) {
     this.animFrame++;
     const { width, height } = this.ctx.canvas;
 
-    // Background color (dark retro space / void)
-    this.ctx.fillStyle = '#151520';
+    // Background color
+    this.ctx.fillStyle = '#14141e';
     this.ctx.fillRect(0, 0, width, height);
-
-    // Disable smoothing for sharp pixel art
     this.ctx.imageSmoothingEnabled = false;
 
     // Depth Sorting: Render tiles in order of (x + y) from back to front
@@ -62,7 +64,6 @@ export class PixelRenderer {
 
         this.renderTile(tile);
 
-        // Check if this tile has an active hover
         if (x === hoverGridX && y === hoverGridY) {
           this.renderHoverHighlight(tile, activeTool);
         }
@@ -72,8 +73,11 @@ export class PixelRenderer {
     // Render vehicles on roads and highway
     this.updateAndRenderVehicles();
 
-    // Render smoke particles
+    // Render fire & smoke particles
     this.updateAndRenderParticles();
+
+    // Apply Day / Night lighting atmosphere & glowing street lights
+    this.applyDayNightLighting(width, height);
   }
 
   private renderTile(tile: Tile) {
@@ -81,7 +85,6 @@ export class PixelRenderer {
     const halfW = (TILE_WIDTH / 2) * this.camera.zoom;
     const halfH = (TILE_HEIGHT / 2) * this.camera.zoom;
 
-    // Viewport Culling check
     const margin = 140 * this.camera.zoom;
     if (
       sx + halfW < -margin ||
@@ -92,47 +95,96 @@ export class PixelRenderer {
       return;
     }
 
-    // 1. Render Base Ground Diamond
-    if (tile.type === TileType.WATER) {
+    // 1. Render Base Ground / Water
+    if (tile.type === TileType.WATER || tile.isBridge) {
       this.drawWaterTile(sx, sy, halfW, halfH, tile.variant);
     } else {
       this.drawGrassTile(sx, sy, halfW, halfH, tile.variant);
     }
 
-    // 2. Render Zone Overlays
+    // 2. Data Heatmap Overlays
+    if (this.engine.overlayMode !== OverlayMode.NORMAL) {
+      this.drawOverlayHeatmap(sx, sy, halfW, halfH, tile);
+    }
+
+    // 3. Render Zone Overlays
     if (tile.zone !== ZoneType.NONE && !tile.building) {
       this.drawZoneOverlay(sx, sy, halfW, halfH, tile.zone);
     }
 
-    // 3. Render Highway / Interstate
+    // 4. Render Highway & Bridges & Roads
     if (tile.type === TileType.HIGHWAY) {
       this.drawHighwayTile(sx, sy, halfW, halfH, tile);
-    }
-    // 4. Render Local Roads
-    else if (tile.type === TileType.ROAD) {
-      this.drawRoadTile(sx, sy, halfW, halfH, tile.roadMask, tile.connectedToHighway);
+    } else if (tile.type === TileType.ROAD) {
+      if (tile.isBridge) {
+        this.drawBridgeTile(sx, sy, halfW, halfH, tile.roadMask);
+      } else {
+        this.drawRoadTile(sx, sy, halfW, halfH, tile.roadMask, tile.connectedToHighway);
+      }
     }
 
-    // 5. Render Structures
+    // 5. Render Structures & Municipal Services
     if (tile.type === TileType.PARK) {
       this.drawPark(sx, sy, halfW, halfH, tile.variant);
     } else if (tile.type === TileType.POWER_PLANT) {
       this.drawPowerPlant(sx, sy, halfW, halfH);
     } else if (tile.type === TileType.WATER_PUMP) {
       this.drawWaterPump(sx, sy, halfW, halfH);
+    } else if (tile.type === TileType.FIRE_STATION) {
+      this.drawFireStation(sx, sy, halfW, halfH);
+    } else if (tile.type === TileType.POLICE_STATION) {
+      this.drawPoliceStation(sx, sy, halfW, halfH);
+    } else if (tile.type === TileType.HOSPITAL) {
+      this.drawHospital(sx, sy, halfW, halfH);
+    } else if (tile.type === TileType.SCHOOL) {
+      this.drawSchool(sx, sy, halfW, halfH);
     } else if (tile.building) {
       this.drawBuilding(sx, sy, halfW, halfH, tile);
     }
   }
 
   /**
-   * Grass diamond with 3D terrain rim depth
+   * Heatmap Overlay Layer
    */
+  private drawOverlayHeatmap(sx: number, sy: number, hw: number, hh: number, tile: Tile) {
+    const ctx = this.ctx;
+    let color: string | null = null;
+    const mode = this.engine.overlayMode;
+
+    if (mode === OverlayMode.POWER) {
+      color = tile.powered ? 'rgba(56, 189, 248, 0.45)' : 'rgba(239, 68, 68, 0.35)';
+    } else if (mode === OverlayMode.WATER) {
+      color = tile.watered ? 'rgba(59, 130, 246, 0.45)' : 'rgba(107, 114, 128, 0.35)';
+    } else if (mode === OverlayMode.FIRE) {
+      const cov = tile.fireCoverage / 100;
+      color = cov > 0.4 ? `rgba(34, 197, 94, ${cov * 0.5})` : `rgba(239, 68, 68, ${(1 - cov) * 0.45})`;
+    } else if (mode === OverlayMode.CRIME) {
+      const c = tile.crime / 100;
+      color = c > 0.1 ? `rgba(220, 38, 38, ${c * 0.6})` : `rgba(34, 197, 94, 0.2)`;
+    } else if (mode === OverlayMode.LAND_VALUE) {
+      const lv = Math.min(1, tile.landValue / 80);
+      color = `rgba(234, 179, 8, ${lv * 0.6})`;
+    } else if (mode === OverlayMode.POLLUTION) {
+      const pol = tile.pollution / 100;
+      color = pol > 0.05 ? `rgba(168, 85, 247, ${pol * 0.65})` : null;
+    }
+
+    if (color) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - hh);
+      ctx.lineTo(sx + hw, sy);
+      ctx.lineTo(sx, sy + hh);
+      ctx.lineTo(sx - hw, sy);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
   private drawGrassTile(sx: number, sy: number, hw: number, hh: number, variant: number) {
     const ctx = this.ctx;
-
-    // Ground 3D extrusion slab (dark earth rim)
     const slabHeight = 8 * this.camera.zoom;
+
     ctx.fillStyle = '#2d5a27';
     ctx.beginPath();
     ctx.moveTo(sx - hw, sy);
@@ -151,7 +203,6 @@ export class PixelRenderer {
     ctx.closePath();
     ctx.fill();
 
-    // Top grass face
     const grassColors = ['#448937', '#4b963d', '#3f8033', '#478f39'];
     ctx.fillStyle = grassColors[variant % grassColors.length];
     ctx.beginPath();
@@ -162,12 +213,10 @@ export class PixelRenderer {
     ctx.closePath();
     ctx.fill();
 
-    // Subtle pixel grid border line
     ctx.strokeStyle = '#38732e';
     ctx.lineWidth = Math.max(1, 1 * this.camera.zoom);
     ctx.stroke();
 
-    // Grass blade speckles
     if (this.camera.zoom >= 0.8) {
       ctx.fillStyle = '#57ac47';
       const speckX = sx + ((variant * 7) % 15 - 7) * this.camera.zoom;
@@ -176,9 +225,6 @@ export class PixelRenderer {
     }
   }
 
-  /**
-   * Water diamond with animated pixel wave shimmer
-   */
   private drawWaterTile(sx: number, sy: number, hw: number, hh: number, variant: number) {
     const ctx = this.ctx;
 
@@ -195,7 +241,6 @@ export class PixelRenderer {
     ctx.lineWidth = Math.max(1, 1 * this.camera.zoom);
     ctx.stroke();
 
-    // Animated water shimmer wave line
     const waveShift = ((this.animFrame / 15 + variant) % 1);
     ctx.fillStyle = '#60a5fa';
     const waveY = sy - hh / 2 + waveShift * hh;
@@ -203,8 +248,60 @@ export class PixelRenderer {
   }
 
   /**
-   * Zone outline tinting (Green R, Blue C, Yellow I)
+   * Steel Truss Bridge over Water
    */
+  private drawBridgeTile(sx: number, sy: number, hw: number, hh: number, mask: number) {
+    const ctx = this.ctx;
+    const z = this.camera.zoom;
+
+    // Concrete river piers underneath bridge deck
+    ctx.fillStyle = '#475569';
+    ctx.fillRect(sx - 4 * z, sy + hh * 0.5, 8 * z, 14 * z);
+    ctx.fillStyle = '#334155';
+    ctx.fillRect(sx - 2 * z, sy + hh * 0.5, 4 * z, 14 * z);
+
+    // Elevated Asphalt Deck
+    ctx.fillStyle = '#33333e';
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - hh * 0.8);
+    ctx.lineTo(sx + hw * 0.8, sy);
+    ctx.lineTo(sx, sy + hh * 0.8);
+    ctx.lineTo(sx - hw * 0.8, sy);
+    ctx.closePath();
+    ctx.fill();
+
+    // Red safety guardrails / trusses
+    ctx.strokeStyle = '#dc2626';
+    ctx.lineWidth = 2 * z;
+
+    // Left railing
+    ctx.beginPath();
+    ctx.moveTo(sx - hw * 0.7, sy - 8 * z);
+    ctx.lineTo(sx, sy + hh * 0.7 - 8 * z);
+    ctx.stroke();
+
+    // Right railing
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - hh * 0.7 - 8 * z);
+    ctx.lineTo(sx + hw * 0.7, sy - 8 * z);
+    ctx.stroke();
+
+    // Yellow center road stripe
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 1.5 * z;
+    if ((mask & 5) === 5 || mask === 0) {
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - hh * 0.5);
+      ctx.lineTo(sx, sy + hh * 0.5);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(sx - hw * 0.5, sy);
+      ctx.lineTo(sx + hw * 0.5, sy);
+      ctx.stroke();
+    }
+  }
+
   private drawZoneOverlay(sx: number, sy: number, hw: number, hh: number, zone: ZoneType) {
     const ctx = this.ctx;
     let fillColor = 'rgba(74, 222, 128, 0.35)';
@@ -232,20 +329,15 @@ export class PixelRenderer {
     ctx.stroke();
   }
 
-  /**
-   * Interstate Highway Rendering (Wide 4-lane divided freeway with median & bridge pillars)
-   */
   private drawHighwayTile(sx: number, sy: number, hw: number, hh: number, tile: Tile) {
     const ctx = this.ctx;
     const z = this.camera.zoom;
 
-    // Bridge concrete pillars if crossing water
-    if (tile.elevation >= 0 && this.grid.getTile(tile.x, tile.y)?.elevation === 0 && this.isNearWater(tile.x, tile.y)) {
+    if (tile.elevation >= 0 && this.isNearWater(tile.x, tile.y)) {
       ctx.fillStyle = '#64748b';
       ctx.fillRect(sx - 4 * z, sy + hh, 8 * z, 14 * z);
     }
 
-    // Wide Interstate dark asphalt surface
     ctx.fillStyle = '#22222a';
     ctx.beginPath();
     ctx.moveTo(sx, sy - hh);
@@ -255,12 +347,10 @@ export class PixelRenderer {
     ctx.closePath();
     ctx.fill();
 
-    // Concrete highway shoulder barriers
     ctx.strokeStyle = '#94a3b8';
     ctx.lineWidth = 2 * z;
     ctx.stroke();
 
-    // Center Concrete Jersey Barrier / Yellow Divider
     ctx.strokeStyle = '#eab308';
     ctx.lineWidth = 2 * z;
     ctx.beginPath();
@@ -268,34 +358,29 @@ export class PixelRenderer {
     ctx.lineTo(sx + hw * 0.7, sy);
     ctx.stroke();
 
-    // White dashed lane markers on both sides of median
     ctx.strokeStyle = '#f8fafc';
     ctx.lineWidth = 1 * z;
     ctx.setLineDash([4 * z, 4 * z]);
 
-    // Northbound lane dash
     ctx.beginPath();
     ctx.moveTo(sx - hw * 0.6, sy - hh * 0.35);
     ctx.lineTo(sx + hw * 0.6, sy - hh * 0.35);
     ctx.stroke();
 
-    // Southbound lane dash
     ctx.beginPath();
     ctx.moveTo(sx - hw * 0.6, sy + hh * 0.35);
     ctx.lineTo(sx + hw * 0.6, sy + hh * 0.35);
     ctx.stroke();
 
-    ctx.setLineDash([]); // reset dash
+    ctx.setLineDash([]);
 
-    // If ramp connector
     if (tile.isRamp) {
       ctx.fillStyle = '#38bdf8';
       ctx.fillRect(sx - 3 * z, sy, 6 * z, 4 * z);
     }
 
-    // Interstate 10 Highway Sign near interchange (x=30, y=14)
     if (tile.x === 30 && tile.y === 14) {
-      ctx.fillStyle = '#15803d'; // Green highway sign
+      ctx.fillStyle = '#15803d';
       ctx.fillRect(sx - 18 * z, sy - 28 * z, 36 * z, 14 * z);
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 1 * z;
@@ -313,16 +398,12 @@ export class PixelRenderer {
     return neighbors.some(n => n.tile.type === TileType.WATER);
   }
 
-  /**
-   * Road rendering with 4-way autotiling bitmask
-   */
   private drawRoadTile(sx: number, sy: number, hw: number, hh: number, mask: number, connectedToHighway: boolean) {
     const ctx = this.ctx;
     const roadColor = connectedToHighway ? '#33333e' : '#454552';
     const roadBorder = '#1c1c24';
     const stripeColor = connectedToHighway ? '#fbbf24' : '#9ca3af';
 
-    // Asphalt base
     ctx.fillStyle = roadColor;
     ctx.beginPath();
     ctx.moveTo(sx, sy - hh);
@@ -339,7 +420,6 @@ export class PixelRenderer {
     const z = this.camera.zoom;
     ctx.fillStyle = stripeColor;
 
-    // Straight SW-NE road
     if ((mask & 5) === 5 || mask === 0) {
       ctx.beginPath();
       ctx.moveTo(sx, sy - hh * 0.6);
@@ -347,9 +427,7 @@ export class PixelRenderer {
       ctx.lineWidth = 2 * z;
       ctx.strokeStyle = stripeColor;
       ctx.stroke();
-    }
-    // Straight NW-SE road
-    else if ((mask & 10) === 10) {
+    } else if ((mask & 10) === 10) {
       ctx.beginPath();
       ctx.moveTo(sx - hw * 0.6, sy);
       ctx.lineTo(sx + hw * 0.6, sy);
@@ -361,25 +439,25 @@ export class PixelRenderer {
       ctx.strokeStyle = stripeColor;
       ctx.lineWidth = 2 * z;
 
-      if (mask & 1) { // North
+      if (mask & 1) {
         ctx.beginPath();
         ctx.moveTo(sx, sy);
         ctx.lineTo(sx, sy - hh * 0.6);
         ctx.stroke();
       }
-      if (mask & 2) { // East
+      if (mask & 2) {
         ctx.beginPath();
         ctx.moveTo(sx, sy);
         ctx.lineTo(sx + hw * 0.6, sy);
         ctx.stroke();
       }
-      if (mask & 4) { // South
+      if (mask & 4) {
         ctx.beginPath();
         ctx.moveTo(sx, sy);
         ctx.lineTo(sx, sy + hh * 0.6);
         ctx.stroke();
       }
-      if (mask & 8) { // West
+      if (mask & 8) {
         ctx.beginPath();
         ctx.moveTo(sx, sy);
         ctx.lineTo(sx - hw * 0.6, sy);
@@ -388,8 +466,72 @@ export class PixelRenderer {
     }
   }
 
+  // --- SERVICE BUILDINGS ---
+
+  private drawFireStation(sx: number, sy: number, hw: number, hh: number) {
+    const z = this.camera.zoom;
+    const height = 34 * z;
+    this.drawIsometricBox(sx, sy, hw * 0.75, hh * 0.75, height, '#b91c1c', '#991b1b', '#7f1d1d');
+
+    // Red truck garage door
+    this.ctx.fillStyle = '#450a0a';
+    this.ctx.fillRect(sx - 8 * z, sy - 12 * z, 16 * z, 10 * z);
+
+    // Alarm bell / siren on roof
+    this.ctx.fillStyle = '#eab308';
+    this.ctx.fillRect(sx - 2 * z, sy - height - 6 * z, 4 * z, 6 * z);
+  }
+
+  private drawPoliceStation(sx: number, sy: number, hw: number, hh: number) {
+    const z = this.camera.zoom;
+    const height = 34 * z;
+    this.drawIsometricBox(sx, sy, hw * 0.75, hh * 0.75, height, '#1e3a8a', '#1e40af', '#172554');
+
+    // Police star badge
+    this.ctx.fillStyle = '#facc15';
+    this.ctx.fillRect(sx - 3 * z, sy - height * 0.6, 6 * z, 6 * z);
+
+    // Flashing blue rooftop emergency light
+    if (this.animFrame % 30 < 15) {
+      this.ctx.fillStyle = '#38bdf8';
+      this.ctx.beginPath();
+      this.ctx.arc(sx, sy - height - 4 * z, 3.5 * z, 0, Math.PI * 2);
+      this.ctx.fill();
+    }
+  }
+
+  private drawHospital(sx: number, sy: number, hw: number, hh: number) {
+    const z = this.camera.zoom;
+    const height = 44 * z;
+    this.drawIsometricBox(sx, sy, hw * 0.8, hh * 0.8, height, '#f8fafc', '#e2e8f0', '#cbd5e1');
+
+    // Red Cross emblem
+    this.ctx.fillStyle = '#dc2626';
+    this.ctx.fillRect(sx - 6 * z, sy - height * 0.65, 12 * z, 4 * z);
+    this.ctx.fillRect(sx - 2 * z, sy - height * 0.65 - 4 * z, 4 * z, 12 * z);
+
+    // Rooftop Helipad 'H'
+    this.ctx.strokeStyle = '#facc15';
+    this.ctx.lineWidth = 1.5 * z;
+    this.ctx.strokeRect(sx - 6 * z, sy - height - 2 * z, 12 * z, 6 * z);
+  }
+
+  private drawSchool(sx: number, sy: number, hw: number, hh: number) {
+    const z = this.camera.zoom;
+    const height = 30 * z;
+    this.drawIsometricBox(sx, sy, hw * 0.75, hh * 0.75, height, '#c2410c', '#9a3412', '#7c2d12');
+
+    // School clock tower
+    this.ctx.fillStyle = '#fef08a';
+    this.ctx.beginPath();
+    this.ctx.arc(sx, sy - height - 6 * z, 4 * z, 0, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.strokeStyle = '#78350f';
+    this.ctx.stroke();
+  }
+
   /**
-   * Procedural Pixel Buildings (Levels 1-3)
+   * Procedural or PixelLab Sprite Buildings
    */
   private drawBuilding(sx: number, sy: number, hw: number, hh: number, tile: Tile) {
     const b = tile.building;
@@ -397,7 +539,6 @@ export class PixelRenderer {
 
     const z = this.camera.zoom;
 
-    // If still under initial construction
     if (b.isConstructing) {
       this.drawConstructionSite(sx, sy, hw, hh);
       if (!b.hasHighwayAccess && (this.animFrame % 60 < 35)) {
@@ -430,6 +571,11 @@ export class PixelRenderer {
       }
     }
 
+    // Active Fire outbreak
+    if (b.onFire) {
+      this.drawActiveFire(sx, sy, z);
+    }
+
     // Power / Water / Highway Warning Icons
     if (!b.hasHighwayAccess && (this.animFrame % 60 < 35)) {
       this.drawWarningIcon(sx, sy - 40 * z, '🚫', '#ef4444');
@@ -437,6 +583,50 @@ export class PixelRenderer {
       this.drawWarningIcon(sx, sy - 40 * z, '⚡', '#facc15');
     } else if (!b.watered && (this.animFrame % 60 < 35)) {
       this.drawWarningIcon(sx, sy - 40 * z, '💧', '#38bdf8');
+    }
+  }
+
+  private drawActiveFire(sx: number, sy: number, z: number) {
+    const ctx = this.ctx;
+    const flameH = (15 + (this.animFrame % 10)) * z;
+
+    // Glowing flame tongues
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath();
+    ctx.moveTo(sx - 12 * z, sy);
+    ctx.lineTo(sx - 4 * z, sy - flameH);
+    ctx.lineTo(sx + 4 * z, sy);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#f97316';
+    ctx.beginPath();
+    ctx.moveTo(sx - 4 * z, sy);
+    ctx.lineTo(sx + 4 * z, sy - flameH * 1.2);
+    ctx.lineTo(sx + 12 * z, sy);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#facc15';
+    ctx.beginPath();
+    ctx.moveTo(sx - 3 * z, sy);
+    ctx.lineTo(sx, sy - flameH * 0.7);
+    ctx.lineTo(sx + 3 * z, sy);
+    ctx.closePath();
+    ctx.fill();
+
+    // Billowing smoke particles
+    if (this.animFrame % 4 === 0) {
+      this.particles.push({
+        x: sx + (Math.random() - 0.5) * 10 * z,
+        y: sy - flameH * 0.8,
+        vx: (Math.random() - 0.5) * 0.5,
+        vy: -1.2 - Math.random() * 0.6,
+        life: 0,
+        maxLife: 40,
+        color: 'rgba(30, 30, 30, 0.75)',
+        size: (5 + Math.random() * 4) * z
+      });
     }
   }
 
@@ -474,7 +664,6 @@ export class PixelRenderer {
       const roofColors = ['#dc2626', '#b45309', '#047857'];
       const roofColor = roofColors[style % roofColors.length];
 
-      // Left Wall
       ctx.fillStyle = '#fef3c7';
       ctx.beginPath();
       ctx.moveTo(sx - hw * 0.6, sy);
@@ -484,7 +673,6 @@ export class PixelRenderer {
       ctx.closePath();
       ctx.fill();
 
-      // Right Wall
       ctx.fillStyle = '#fde68a';
       ctx.beginPath();
       ctx.moveTo(sx, sy + hh * 0.6);
@@ -494,7 +682,6 @@ export class PixelRenderer {
       ctx.closePath();
       ctx.fill();
 
-      // Pitched Roof
       ctx.fillStyle = roofColor;
       ctx.beginPath();
       ctx.moveTo(sx - hw * 0.6, sy - wallH);
@@ -511,12 +698,10 @@ export class PixelRenderer {
       ctx.closePath();
       ctx.fill();
 
-      // Door & Window
       ctx.fillStyle = '#78350f';
       ctx.fillRect(sx - 4 * z, sy + 2 * z - wallH * 0.4, 6 * z, 8 * z);
       ctx.fillStyle = '#38bdf8';
       ctx.fillRect(sx + 8 * z, sy - 2 * z - wallH * 0.4, 4 * z, 4 * z);
-
     } else if (level === 2) {
       const height = 36 * z;
       this.drawIsometricBox(sx, sy, hw * 0.7, hh * 0.7, height, '#b91c1c', '#991b1b', '#7f1d1d');
@@ -526,7 +711,6 @@ export class PixelRenderer {
         ctx.fillRect(sx - 10 * z, fy, 4 * z, 6 * z);
         ctx.fillRect(sx + 4 * z, fy + 2 * z, 4 * z, 6 * z);
       }
-
     } else {
       const height = 64 * z;
       this.drawIsometricBox(sx, sy, hw * 0.75, hh * 0.75, height, '#e2e8f0', '#cbd5e1', '#94a3b8');
@@ -552,7 +736,6 @@ export class PixelRenderer {
       ctx.fillRect(sx - 12 * z, sy - 8 * z, 12 * z, 4 * z);
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(sx - 6 * z, sy - 8 * z, 3 * z, 4 * z);
-
     } else if (level === 2) {
       const height = 48 * z;
       this.drawIsometricBox(sx, sy, hw * 0.75, hh * 0.75, height, '#64748b', '#475569', '#334155');
@@ -563,7 +746,6 @@ export class PixelRenderer {
         ctx.fillRect(sx - 12 * z, fy, 8 * z, 5 * z);
         ctx.fillRect(sx + 4 * z, fy + 3 * z, 8 * z, 5 * z);
       }
-
     } else {
       const height = 75 * z;
       this.drawIsometricBox(sx, sy, hw * 0.8, hh * 0.8, height, '#06b6d4', '#0891b2', '#0e7490');
@@ -592,7 +774,6 @@ export class PixelRenderer {
       this.drawIsometricBox(sx, sy, hw * 0.75, hh * 0.75, height, '#d97706', '#b45309', '#78350f');
       ctx.fillStyle = '#4b5563';
       ctx.fillRect(sx - 6 * z, sy - 8 * z, 10 * z, 10 * z);
-
     } else if (level === 2) {
       const height = 30 * z;
       this.drawIsometricBox(sx, sy, hw * 0.75, hh * 0.75, height, '#475569', '#334155', '#1e293b');
@@ -614,7 +795,6 @@ export class PixelRenderer {
           size: 4 * z
         });
       }
-
     } else {
       const height = 45 * z;
       this.drawIsometricBox(sx, sy, hw * 0.8, hh * 0.8, height, '#374151', '#1f2937', '#111827');
@@ -648,16 +828,9 @@ export class PixelRenderer {
       return;
     }
     const height = 40 * z;
-
     this.drawIsometricBox(sx, sy, hw * 0.8, hh * 0.8, height, '#475569', '#334155', '#1e293b');
-
     this.ctx.fillStyle = '#f59e0b';
     this.ctx.fillRect(sx - 8 * z, sy - height - 4 * z, 16 * z, 6 * z);
-
-    this.ctx.fillStyle = '#000000';
-    for (let i = -6; i <= 6; i += 4) {
-      this.ctx.fillRect(sx + i * z, sy - height - 4 * z, 2 * z, 6 * z);
-    }
   }
 
   private drawWaterPump(sx: number, sy: number, hw: number, hh: number) {
@@ -670,9 +843,7 @@ export class PixelRenderer {
       return;
     }
     const height = 26 * z;
-
     this.drawIsometricBox(sx, sy, hw * 0.75, hh * 0.75, height, '#0284c7', '#0369a1', '#075985');
-
     this.ctx.fillStyle = '#38bdf8';
     this.ctx.beginPath();
     this.ctx.arc(sx, sy - height - 3 * z, 7 * z, Math.PI, 0);
@@ -689,7 +860,6 @@ export class PixelRenderer {
       return;
     }
     const ctx = this.ctx;
-
     ctx.fillStyle = '#a8a29e';
     ctx.beginPath();
     ctx.moveTo(sx, sy - hh * 0.4);
@@ -707,11 +877,6 @@ export class PixelRenderer {
     ctx.beginPath();
     ctx.arc(sx, sy - 20 * z, 12 * z, 0, Math.PI * 2);
     ctx.fill();
-
-    ctx.fillStyle = '#4ade80';
-    ctx.beginPath();
-    ctx.arc(sx - 3 * z, sy - 23 * z, 6 * z, 0, Math.PI * 2);
-    ctx.fill();
   }
 
   private drawIsometricBox(
@@ -726,7 +891,6 @@ export class PixelRenderer {
   ) {
     const ctx = this.ctx;
 
-    // Left Face
     ctx.fillStyle = leftColor;
     ctx.beginPath();
     ctx.moveTo(sx - hw, sy);
@@ -736,7 +900,6 @@ export class PixelRenderer {
     ctx.closePath();
     ctx.fill();
 
-    // Right Face
     ctx.fillStyle = rightColor;
     ctx.beginPath();
     ctx.moveTo(sx, sy + hh);
@@ -746,7 +909,6 @@ export class PixelRenderer {
     ctx.closePath();
     ctx.fill();
 
-    // Top Face
     ctx.fillStyle = topColor;
     ctx.beginPath();
     ctx.moveTo(sx, sy - hh - height);
@@ -820,7 +982,7 @@ export class PixelRenderer {
   private updateAndRenderVehicles() {
     const highwayY = 14;
 
-    // 1. Spawn Highway Interstate Semi-Trucks and Commuters
+    // 1. Interstate traffic
     if (this.vehicles.filter(v => v.y === highwayY).length < 6 && Math.random() < 0.08) {
       const isEastbound = Math.random() > 0.5;
       const startX = isEastbound ? 0 : this.grid.size - 1;
@@ -833,13 +995,13 @@ export class PixelRenderer {
         targetX: targetX,
         targetY: highwayY,
         color: ['#dc2626', '#2563eb', '#16a34a', '#d97706', '#9333ea'][Math.floor(Math.random() * 5)],
-        speed: 0.08, // fast highway speed
+        speed: 0.08,
         isTruck: Math.random() > 0.4
       });
     }
 
-    // 2. Spawn Local City Vehicles on Connected Roads
-    if (this.vehicles.length < 24 && Math.random() < 0.05) {
+    // 2. Local City traffic (including Fire Trucks and Police Cruisers)
+    if (this.vehicles.length < 25 && Math.random() < 0.06) {
       const roadTiles: Tile[] = [];
       for (let x = 0; x < this.grid.size; x++) {
         for (let y = 0; y < this.grid.size; y++) {
@@ -854,14 +1016,22 @@ export class PixelRenderer {
         if (neighbors.length > 0) {
           const target = neighbors[Math.floor(Math.random() * neighbors.length)].tile;
           const colors = ['#f59e0b', '#3b82f6', '#ef4444', '#10b981', '#f3f4f6'];
+
+          // Emergency vehicle chance
+          let isEmergency: 'fire' | 'police' | undefined;
+          if (Math.random() < 0.15) {
+            isEmergency = Math.random() < 0.5 ? 'fire' : 'police';
+          }
+
           this.vehicles.push({
             id: Math.random().toString(),
             x: start.x,
             y: start.y,
             targetX: target.x,
             targetY: target.y,
-            color: colors[Math.floor(Math.random() * colors.length)],
-            speed: 0.035
+            color: isEmergency === 'fire' ? '#dc2626' : (isEmergency === 'police' ? '#1e3a8a' : colors[Math.floor(Math.random() * colors.length)]),
+            speed: isEmergency ? 0.055 : 0.035,
+            isEmergency
           });
         }
       }
@@ -879,7 +1049,6 @@ export class PixelRenderer {
         v.x = v.targetX;
         v.y = v.targetY;
 
-        // If on interstate highway, continue along highway line
         if (v.y === highwayY) {
           const nextX = v.x + (dx >= 0 ? 1 : -1);
           if (nextX >= 0 && nextX < this.grid.size) {
@@ -890,7 +1059,6 @@ export class PixelRenderer {
             continue;
           }
         } else {
-          // Local road navigation
           const neighbors = this.grid.getNeighbors(v.targetX, v.targetY).filter(n => n.tile.type === TileType.ROAD || n.tile.type === TileType.HIGHWAY);
           if (neighbors.length > 0) {
             const next = neighbors[Math.floor(Math.random() * neighbors.length)].tile;
@@ -906,8 +1074,18 @@ export class PixelRenderer {
         v.y += (dy / dist) * v.speed;
       }
 
-      // Render vehicle sprite
       const { x: sx, y: sy } = this.camera.worldToScreen(v.x, v.y, 0);
+
+      // Emergency flashing siren
+      if (v.isEmergency) {
+        this.ctx.fillStyle = v.color;
+        this.ctx.fillRect(sx - 3 * z, sy - 2 * z, 6 * z, 4 * z);
+
+        const sirenColor = (this.animFrame % 16 < 8) ? '#ef4444' : '#38bdf8';
+        this.ctx.fillStyle = sirenColor;
+        this.ctx.fillRect(sx - 1 * z, sy - 4 * z, 2 * z, 2 * z);
+        continue;
+      }
 
       if (v.isTruck) {
         if (assetManager.hasSprite('semi_truck')) {
@@ -916,12 +1094,11 @@ export class PixelRenderer {
           const h = 21 * z;
           this.ctx.drawImage(img, sx - w / 2, sy - h * 0.7, w, h);
         } else {
-          // Semi-truck trailer & cab
-          this.ctx.fillStyle = '#e2e8f0'; // cab
+          this.ctx.fillStyle = '#e2e8f0';
           this.ctx.fillRect(sx - 6 * z, sy - 3 * z, 5 * z, 5 * z);
-          this.ctx.fillStyle = v.color; // shipping container
+          this.ctx.fillStyle = v.color;
           this.ctx.fillRect(sx - 1 * z, sy - 4 * z, 10 * z, 6 * z);
-          this.ctx.fillStyle = '#000000'; // wheels
+          this.ctx.fillStyle = '#000000';
           this.ctx.fillRect(sx - 5 * z, sy + 2 * z, 3 * z, 2 * z);
           this.ctx.fillRect(sx + 4 * z, sy + 2 * z, 4 * z, 2 * z);
         }
@@ -932,13 +1109,38 @@ export class PixelRenderer {
           const h = 18 * z;
           this.ctx.drawImage(img, sx - w / 2, sy - h * 0.7, w, h);
         } else {
-          // Passenger car / taxi
           this.ctx.fillStyle = v.color;
           this.ctx.fillRect(sx - 3 * z, sy - 2 * z, 6 * z, 4 * z);
           this.ctx.fillStyle = '#000000';
           this.ctx.fillRect(sx - 2 * z, sy - 1 * z, 2 * z, 2 * z);
         }
       }
+    }
+  }
+
+  /**
+   * Day / Night Atmosphere tinting
+   */
+  private applyDayNightLighting(width: number, height: number) {
+    const hour = this.engine.gameHour;
+    let tintColor: string | null = null;
+
+    // Midnight / Deep Night
+    if (hour >= 21 || hour < 5) {
+      tintColor = 'rgba(10, 16, 45, 0.48)';
+    }
+    // Dawn / Sunrise (5:00 - 7:00)
+    else if (hour >= 5 && hour < 7) {
+      tintColor = 'rgba(251, 146, 60, 0.22)';
+    }
+    // Sunset / Dusk (18:00 - 21:00)
+    else if (hour >= 18 && hour < 21) {
+      tintColor = 'rgba(147, 51, 234, 0.25)';
+    }
+
+    if (tintColor) {
+      this.ctx.fillStyle = tintColor;
+      this.ctx.fillRect(0, 0, width, height);
     }
   }
 }
