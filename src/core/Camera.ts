@@ -18,11 +18,17 @@ export class Camera {
   }
 
   public centerOnMap(viewportWidth: number, viewportHeight: number, mapSize: number) {
-    // In isometric projection, the center of the map (mapSize/2, mapSize/2) is at:
-    // x = 0
-    // y = (mapSize/2 + mapSize/2) * (TILE_HEIGHT / 2) = mapSize * (TILE_HEIGHT / 2)
-    this.x = viewportWidth / 2;
-    this.y = (viewportHeight / 2) - (mapSize * (TILE_HEIGHT / 4) * this.zoom);
+    this.centerOnTile(Math.floor(mapSize * 0.45), Math.floor(mapSize * 0.25), viewportWidth, viewportHeight);
+  }
+
+  public centerOnTile(gridX: number, gridY: number, viewportWidth: number, viewportHeight: number) {
+    const halfW = TILE_WIDTH / 2;
+    const halfH = TILE_HEIGHT / 2;
+    const isoX = (gridX - gridY) * halfW;
+    const isoY = (gridX + gridY) * halfH;
+
+    this.x = viewportWidth / 2 - isoX * this.zoom;
+    this.y = viewportHeight / 2 - isoY * this.zoom;
   }
 
   /**

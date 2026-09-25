@@ -1,6 +1,6 @@
 export const TILE_WIDTH = 64;
 export const TILE_HEIGHT = 32;
-export const MAP_SIZE = 36; // 36x36 grid
+export const MAP_SIZE = 64; // Expanded 64x64 grid (4,096 tiles)
 
 export enum ZoneType {
   NONE = 'NONE',
@@ -14,6 +14,7 @@ export enum TileType {
   WATER = 'WATER',
   DIRT = 'DIRT',
   ROAD = 'ROAD',
+  HIGHWAY = 'HIGHWAY',
   BUILDING = 'BUILDING',
   POWER_PLANT = 'POWER_PLANT',
   WATER_PUMP = 'WATER_PUMP',
@@ -24,14 +25,15 @@ export interface BuildingData {
   id: string;
   zone: ZoneType;
   level: number; // 1 to 3
-  progress: number; // 0 to 100 for construction / upgrade
+  progress: number; // 0 to 100
   isConstructing: boolean;
   residents: number;
   jobs: number;
   powered: boolean;
   watered: boolean;
+  hasHighwayAccess: boolean;
   abandoned: boolean;
-  style: number; // random visual variant
+  style: number;
 }
 
 export interface Tile {
@@ -44,10 +46,11 @@ export interface Tile {
   roadMask: number; // 4-bit bitmask (N:1, E:2, S:4, W:8)
   powered: boolean;
   watered: boolean;
+  connectedToHighway: boolean;
   landValue: number;
   pollution: number;
-  // Natural decor variant (different grass blades, flowers)
   variant: number;
+  isRamp?: boolean;
 }
 
 export const COSTS = {

@@ -15,12 +15,13 @@ interface Particle {
 
 interface Vehicle {
   id: string;
-  x: number; // grid float coordinates
+  x: number;
   y: number;
   targetX: number;
   targetY: number;
   color: string;
   speed: number;
+  isTruck?: boolean;
 }
 
 export class PixelRenderer {
@@ -41,8 +42,8 @@ export class PixelRenderer {
     this.animFrame++;
     const { width, height } = this.ctx.canvas;
 
-    // Background color (dark retro night-sky / void)
-    this.ctx.fillStyle = '#161622';
+    // Background color (dark retro space / void)
+    this.ctx.fillStyle = '#151520';
     this.ctx.fillRect(0, 0, width, height);
 
     // Disable smoothing for sharp pixel art
@@ -67,7 +68,7 @@ export class PixelRenderer {
       }
     }
 
-    // Render vehicles on roads
+    // Render vehicles on roads and highway
     this.updateAndRenderVehicles();
 
     // Render smoke particles
@@ -80,7 +81,7 @@ export class PixelRenderer {
     const halfH = (TILE_HEIGHT / 2) * this.camera.zoom;
 
     // Viewport Culling check
-    const margin = 120 * this.camera.zoom;
+    const margin = 140 * this.camera.zoom;
     if (
       sx + halfW < -margin ||
       sx - halfW > this.ctx.canvas.width + margin ||
@@ -102,12 +103,16 @@ export class PixelRenderer {
       this.drawZoneOverlay(sx, sy, halfW, halfH, tile.zone);
     }
 
-    // 3. Render Roads
-    if (tile.type === TileType.ROAD) {
-      this.drawRoadTile(sx, sy, halfW, halfH, tile.roadMask);
+    // 3. Render Highway / Interstate
+    if (tile.type === TileType.HIGHWAY) {
+      this.drawHighwayTile(sx, sy, halfW, halfH, tile);
+    }
+    // 4. Render Local Roads
+    else if (tile.type === TileType.ROAD) {
+      this.drawRoadTile(sx, sy, halfW, halfH, tile.roadMask, tile.connectedToHighway);
     }
 
-    // 4. Render Structures
+    // 5. Render Structures
     if (tile.type === TileType.PARK) {
       this.drawPark(sx, sy, halfW, halfH, tile.variant);
     } else if (tile.type === TileType.POWER_PLANT) {
@@ -185,7 +190,6 @@ export class PixelRenderer {
     ctx.closePath();
     ctx.fill();
 
-    // Water border
     ctx.strokeStyle = '#1d4ed8';
     ctx.lineWidth = Math.max(1, 1 * this.camera.zoom);
     ctx.stroke();
@@ -202,7 +206,7 @@ export class PixelRenderer {
    */
   private drawZoneOverlay(sx: number, sy: number, hw: number, hh: number, zone: ZoneType) {
     const ctx = this.ctx;
-    let fillColor = 'rgba(74, 222, 128, 0.35)'; // Resi
+    let fillColor = 'rgba(74, 222, 128, 0.35)';
     let strokeColor = '#22c55e';
 
     if (zone === ZoneType.COMMERCIAL) {
@@ -228,15 +232,96 @@ export class PixelRenderer {
   }
 
   /**
+   * Interstate Highway Rendering (Wide 4-lane divided freeway with median & bridge pillars)
+   */
+  private drawHighwayTile(sx: number, sy: number, hw: number, hh: number, tile: Tile) {
+    const ctx = this.ctx;
+    const z = this.camera.zoom;
+
+    // Bridge concrete pillars if crossing water
+    if (tile.elevation >= 0 && this.grid.getTile(tile.x, tile.y)?.elevation === 0 && this.isNearWater(tile.x, tile.y)) {
+      ctx.fillStyle = '#64748b';
+      ctx.fillRect(sx - 4 * z, sy + hh, 8 * z, 14 * z);
+    }
+
+    // Wide Interstate dark asphalt surface
+    ctx.fillStyle = '#22222a';
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - hh);
+    ctx.lineTo(sx + hw, sy);
+    ctx.lineTo(sx, sy + hh);
+    ctx.lineTo(sx - hw, sy);
+    ctx.closePath();
+    ctx.fill();
+
+    // Concrete highway shoulder barriers
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 2 * z;
+    ctx.stroke();
+
+    // Center Concrete Jersey Barrier / Yellow Divider
+    ctx.strokeStyle = '#eab308';
+    ctx.lineWidth = 2 * z;
+    ctx.beginPath();
+    ctx.moveTo(sx - hw * 0.7, sy);
+    ctx.lineTo(sx + hw * 0.7, sy);
+    ctx.stroke();
+
+    // White dashed lane markers on both sides of median
+    ctx.strokeStyle = '#f8fafc';
+    ctx.lineWidth = 1 * z;
+    ctx.setLineDash([4 * z, 4 * z]);
+
+    // Northbound lane dash
+    ctx.beginPath();
+    ctx.moveTo(sx - hw * 0.6, sy - hh * 0.35);
+    ctx.lineTo(sx + hw * 0.6, sy - hh * 0.35);
+    ctx.stroke();
+
+    // Southbound lane dash
+    ctx.beginPath();
+    ctx.moveTo(sx - hw * 0.6, sy + hh * 0.35);
+    ctx.lineTo(sx + hw * 0.6, sy + hh * 0.35);
+    ctx.stroke();
+
+    ctx.setLineDash([]); // reset dash
+
+    // If ramp connector
+    if (tile.isRamp) {
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillRect(sx - 3 * z, sy, 6 * z, 4 * z);
+    }
+
+    // Interstate 10 Highway Sign near interchange (x=30, y=14)
+    if (tile.x === 30 && tile.y === 14) {
+      ctx.fillStyle = '#15803d'; // Green highway sign
+      ctx.fillRect(sx - 18 * z, sy - 28 * z, 36 * z, 14 * z);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1 * z;
+      ctx.strokeRect(sx - 18 * z, sy - 28 * z, 36 * z, 14 * z);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `bold ${Math.max(6, Math.floor(7 * z))}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText('I-10 METRO', sx, sy - 18 * z);
+    }
+  }
+
+  private isNearWater(x: number, y: number): boolean {
+    const neighbors = this.grid.getNeighbors(x, y);
+    return neighbors.some(n => n.tile.type === TileType.WATER);
+  }
+
+  /**
    * Road rendering with 4-way autotiling bitmask
    */
-  private drawRoadTile(sx: number, sy: number, hw: number, hh: number, mask: number) {
+  private drawRoadTile(sx: number, sy: number, hw: number, hh: number, mask: number, connectedToHighway: boolean) {
     const ctx = this.ctx;
-    const roadColor = '#33333e';
+    const roadColor = connectedToHighway ? '#33333e' : '#454552';
     const roadBorder = '#1c1c24';
-    const stripeColor = '#fbbf24'; // Yellow centerline
+    const stripeColor = connectedToHighway ? '#fbbf24' : '#9ca3af';
 
-    // Dark asphalt base
+    // Asphalt base
     ctx.fillStyle = roadColor;
     ctx.beginPath();
     ctx.moveTo(sx, sy - hh);
@@ -250,11 +335,10 @@ export class PixelRenderer {
     ctx.lineWidth = Math.max(1, 1 * this.camera.zoom);
     ctx.stroke();
 
-    // Road markings based on connections (North=1, East=2, South=4, West=8)
     const z = this.camera.zoom;
     ctx.fillStyle = stripeColor;
 
-    // Straight SW-NE road (South & North connected, or isolated)
+    // Straight SW-NE road
     if ((mask & 5) === 5 || mask === 0) {
       ctx.beginPath();
       ctx.moveTo(sx, sy - hh * 0.6);
@@ -263,7 +347,7 @@ export class PixelRenderer {
       ctx.strokeStyle = stripeColor;
       ctx.stroke();
     }
-    // Straight NW-SE road (West & East connected)
+    // Straight NW-SE road
     else if ((mask & 10) === 10) {
       ctx.beginPath();
       ctx.moveTo(sx - hw * 0.6, sy);
@@ -272,7 +356,6 @@ export class PixelRenderer {
       ctx.strokeStyle = stripeColor;
       ctx.stroke();
     } else {
-      // Junctions / Curves / Dead-ends: draw center hub + stubs
       ctx.fillRect(sx - 2 * z, sy - 2 * z, 4 * z, 4 * z);
       ctx.strokeStyle = stripeColor;
       ctx.lineWidth = 2 * z;
@@ -316,6 +399,9 @@ export class PixelRenderer {
     // If still under initial construction
     if (b.isConstructing) {
       this.drawConstructionSite(sx, sy, hw, hh);
+      if (!b.hasHighwayAccess && (this.animFrame % 60 < 35)) {
+        this.drawWarningIcon(sx, sy - 30 * z, '🚫', '#ef4444');
+      }
       return;
     }
 
@@ -330,8 +416,10 @@ export class PixelRenderer {
       this.drawIndustrialBuilding(sx, sy, hw, hh, level, style, z);
     }
 
-    // Power / Water Warning Icons if lacking utilities
-    if (!b.powered && (this.animFrame % 60 < 35)) {
+    // Power / Water / Highway Warning Icons
+    if (!b.hasHighwayAccess && (this.animFrame % 60 < 35)) {
+      this.drawWarningIcon(sx, sy - 40 * z, '🚫', '#ef4444');
+    } else if (!b.powered && (this.animFrame % 60 < 35)) {
       this.drawWarningIcon(sx, sy - 40 * z, '⚡', '#facc15');
     } else if (!b.watered && (this.animFrame % 60 < 35)) {
       this.drawWarningIcon(sx, sy - 40 * z, '💧', '#38bdf8');
@@ -342,7 +430,6 @@ export class PixelRenderer {
     const ctx = this.ctx;
     const z = this.camera.zoom;
 
-    // Dirt base
     ctx.fillStyle = '#785230';
     ctx.beginPath();
     ctx.moveTo(sx, sy - hh * 0.8);
@@ -352,7 +439,6 @@ export class PixelRenderer {
     ctx.closePath();
     ctx.fill();
 
-    // Wooden scaffolding posts
     ctx.strokeStyle = '#eab308';
     ctx.lineWidth = 2 * z;
     ctx.beginPath();
@@ -369,7 +455,6 @@ export class PixelRenderer {
     const ctx = this.ctx;
 
     if (level === 1) {
-      // Cozy 1-story cottage with pitched roof
       const roofH = 22 * z;
       const wallH = 16 * z;
       const roofColors = ['#dc2626', '#b45309', '#047857'];
@@ -419,10 +504,8 @@ export class PixelRenderer {
       ctx.fillRect(sx + 8 * z, sy - 2 * z - wallH * 0.4, 4 * z, 4 * z);
 
     } else if (level === 2) {
-      // 2-Story Brick Townhouse
       const height = 36 * z;
       this.drawIsometricBox(sx, sy, hw * 0.7, hh * 0.7, height, '#b91c1c', '#991b1b', '#7f1d1d');
-      // Windows
       ctx.fillStyle = '#bae6fd';
       for (let floor = 0; floor < 2; floor++) {
         const fy = sy - 10 * z - floor * 14 * z;
@@ -431,17 +514,14 @@ export class PixelRenderer {
       }
 
     } else {
-      // High-Density Modern Apartment Tower
       const height = 64 * z;
       this.drawIsometricBox(sx, sy, hw * 0.75, hh * 0.75, height, '#e2e8f0', '#cbd5e1', '#94a3b8');
-      // Balconies and window rows
       ctx.fillStyle = '#0284c7';
       for (let floor = 0; floor < 4; floor++) {
         const fy = sy - 12 * z - floor * 13 * z;
         ctx.fillRect(sx - 12 * z, fy, 6 * z, 5 * z);
         ctx.fillRect(sx + 5 * z, fy + 3 * z, 6 * z, 5 * z);
       }
-      // Rooftop water tank
       ctx.fillStyle = '#78350f';
       ctx.fillRect(sx - 4 * z, sy - height - 10 * z, 8 * z, 10 * z);
     }
@@ -451,22 +531,18 @@ export class PixelRenderer {
     const ctx = this.ctx;
 
     if (level === 1) {
-      // Corner Store with awning
       const height = 24 * z;
       this.drawIsometricBox(sx, sy, hw * 0.7, hh * 0.7, height, '#38bdf8', '#0284c7', '#0369a1');
 
-      // Striped awning
       ctx.fillStyle = '#ef4444';
       ctx.fillRect(sx - 12 * z, sy - 8 * z, 12 * z, 4 * z);
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(sx - 6 * z, sy - 8 * z, 3 * z, 4 * z);
 
     } else if (level === 2) {
-      // 4-Story Office Building
       const height = 48 * z;
       this.drawIsometricBox(sx, sy, hw * 0.75, hh * 0.75, height, '#64748b', '#475569', '#334155');
 
-      // Grid glass windows
       ctx.fillStyle = '#7dd3fc';
       for (let floor = 0; floor < 3; floor++) {
         const fy = sy - 12 * z - floor * 11 * z;
@@ -475,11 +551,9 @@ export class PixelRenderer {
       }
 
     } else {
-      // Corporate Glass Skyscraper
       const height = 75 * z;
       this.drawIsometricBox(sx, sy, hw * 0.8, hh * 0.8, height, '#06b6d4', '#0891b2', '#0e7490');
 
-      // Rooftop antenna tower
       ctx.strokeStyle = '#ef4444';
       ctx.lineWidth = 2 * z;
       ctx.beginPath();
@@ -487,7 +561,6 @@ export class PixelRenderer {
       ctx.lineTo(sx, sy - height - 16 * z);
       ctx.stroke();
 
-      // Blinking red warning light on antenna
       if (this.animFrame % 40 < 20) {
         ctx.fillStyle = '#ff0000';
         ctx.beginPath();
@@ -501,26 +574,20 @@ export class PixelRenderer {
     const ctx = this.ctx;
 
     if (level === 1) {
-      // Metal warehouse
       const height = 20 * z;
       this.drawIsometricBox(sx, sy, hw * 0.75, hh * 0.75, height, '#d97706', '#b45309', '#78350f');
-
-      // Metal roll-up door
       ctx.fillStyle = '#4b5563';
       ctx.fillRect(sx - 6 * z, sy - 8 * z, 10 * z, 10 * z);
 
     } else if (level === 2) {
-      // Factory with smokestack
       const height = 30 * z;
       this.drawIsometricBox(sx, sy, hw * 0.75, hh * 0.75, height, '#475569', '#334155', '#1e293b');
 
-      // Smokestack
       const stackX = sx + 8 * z;
       const stackY = sy - height - 14 * z;
       ctx.fillStyle = '#dc2626';
       ctx.fillRect(stackX - 3 * z, stackY, 6 * z, 16 * z);
 
-      // Emit animated smoke particle
       if (this.animFrame % 10 === 0) {
         this.particles.push({
           x: stackX,
@@ -535,11 +602,9 @@ export class PixelRenderer {
       }
 
     } else {
-      // Heavy Industrial Plant
       const height = 45 * z;
       this.drawIsometricBox(sx, sy, hw * 0.8, hh * 0.8, height, '#374151', '#1f2937', '#111827');
 
-      // Twin cooling towers
       ctx.fillStyle = '#9ca3af';
       ctx.fillRect(sx - 12 * z, sy - height - 8 * z, 7 * z, 12 * z);
       ctx.fillRect(sx + 5 * z, sy - height - 8 * z, 7 * z, 12 * z);
@@ -563,14 +628,11 @@ export class PixelRenderer {
     const z = this.camera.zoom;
     const height = 40 * z;
 
-    // Concrete reactor facility
     this.drawIsometricBox(sx, sy, hw * 0.8, hh * 0.8, height, '#475569', '#334155', '#1e293b');
 
-    // Electric transformer coils
     this.ctx.fillStyle = '#f59e0b';
     this.ctx.fillRect(sx - 8 * z, sy - height - 4 * z, 16 * z, 6 * z);
 
-    // Hazard stripes
     this.ctx.fillStyle = '#000000';
     for (let i = -6; i <= 6; i += 4) {
       this.ctx.fillRect(sx + i * z, sy - height - 4 * z, 2 * z, 6 * z);
@@ -583,7 +645,6 @@ export class PixelRenderer {
 
     this.drawIsometricBox(sx, sy, hw * 0.75, hh * 0.75, height, '#0284c7', '#0369a1', '#075985');
 
-    // Water reservoir dome
     this.ctx.fillStyle = '#38bdf8';
     this.ctx.beginPath();
     this.ctx.arc(sx, sy - height - 3 * z, 7 * z, Math.PI, 0);
@@ -594,7 +655,6 @@ export class PixelRenderer {
     const ctx = this.ctx;
     const z = this.camera.zoom;
 
-    // Stone pathway in park
     ctx.fillStyle = '#a8a29e';
     ctx.beginPath();
     ctx.moveTo(sx, sy - hh * 0.4);
@@ -604,11 +664,9 @@ export class PixelRenderer {
     ctx.closePath();
     ctx.fill();
 
-    // Pixel tree trunk
     ctx.fillStyle = '#78350f';
     ctx.fillRect(sx - 2 * z, sy - 14 * z, 4 * z, 14 * z);
 
-    // Tree foliage layers
     const foliageColors = ['#15803d', '#16a34a', '#22c55e'];
     ctx.fillStyle = foliageColors[variant % foliageColors.length];
     ctx.beginPath();
@@ -621,9 +679,6 @@ export class PixelRenderer {
     ctx.fill();
   }
 
-  /**
-   * Helper to draw a true 3D isometric extruded rectangular block
-   */
   private drawIsometricBox(
     sx: number,
     sy: number,
@@ -680,16 +735,13 @@ export class PixelRenderer {
     ctx.restore();
   }
 
-  /**
-   * Cursor hover indicator
-   */
   private renderHoverHighlight(tile: Tile, activeTool: string) {
     const { x: sx, y: sy } = this.camera.worldToScreen(tile.x, tile.y, tile.elevation);
     const halfW = (TILE_WIDTH / 2) * this.camera.zoom;
     const halfH = (TILE_HEIGHT / 2) * this.camera.zoom;
     const ctx = this.ctx;
 
-    let strokeColor = '#60a5fa'; // default blue
+    let strokeColor = '#60a5fa';
     let fillColor = 'rgba(96, 165, 250, 0.25)';
 
     if (activeTool === 'demolish') {
@@ -731,13 +783,33 @@ export class PixelRenderer {
   }
 
   private updateAndRenderVehicles() {
-    // Spawn traffic vehicles occasionally on road tiles
-    if (this.vehicles.length < 12 && Math.random() < 0.05) {
+    const highwayY = 14;
+
+    // 1. Spawn Highway Interstate Semi-Trucks and Commuters
+    if (this.vehicles.filter(v => v.y === highwayY).length < 6 && Math.random() < 0.08) {
+      const isEastbound = Math.random() > 0.5;
+      const startX = isEastbound ? 0 : this.grid.size - 1;
+      const targetX = isEastbound ? 1 : this.grid.size - 2;
+
+      this.vehicles.push({
+        id: Math.random().toString(),
+        x: startX,
+        y: highwayY,
+        targetX: targetX,
+        targetY: highwayY,
+        color: ['#dc2626', '#2563eb', '#16a34a', '#d97706', '#9333ea'][Math.floor(Math.random() * 5)],
+        speed: 0.08, // fast highway speed
+        isTruck: Math.random() > 0.4
+      });
+    }
+
+    // 2. Spawn Local City Vehicles on Connected Roads
+    if (this.vehicles.length < 24 && Math.random() < 0.05) {
       const roadTiles: Tile[] = [];
       for (let x = 0; x < this.grid.size; x++) {
         for (let y = 0; y < this.grid.size; y++) {
           const t = this.grid.getTile(x, y);
-          if (t && t.type === TileType.ROAD) roadTiles.push(t);
+          if (t && t.type === TileType.ROAD && t.connectedToHighway) roadTiles.push(t);
         }
       }
 
@@ -754,7 +826,7 @@ export class PixelRenderer {
             targetX: target.x,
             targetY: target.y,
             color: colors[Math.floor(Math.random() * colors.length)],
-            speed: 0.03
+            speed: 0.035
           });
         }
       }
@@ -772,27 +844,52 @@ export class PixelRenderer {
         v.x = v.targetX;
         v.y = v.targetY;
 
-        // Pick next road neighbor
-        const neighbors = this.grid.getNeighbors(v.targetX, v.targetY).filter(n => n.tile.type === TileType.ROAD);
-        if (neighbors.length > 0) {
-          const next = neighbors[Math.floor(Math.random() * neighbors.length)].tile;
-          v.targetX = next.x;
-          v.targetY = next.y;
+        // If on interstate highway, continue along highway line
+        if (v.y === highwayY) {
+          const nextX = v.x + (dx >= 0 ? 1 : -1);
+          if (nextX >= 0 && nextX < this.grid.size) {
+            v.targetX = nextX;
+            v.targetY = highwayY;
+          } else {
+            this.vehicles.splice(i, 1);
+            continue;
+          }
         } else {
-          this.vehicles.splice(i, 1);
-          continue;
+          // Local road navigation
+          const neighbors = this.grid.getNeighbors(v.targetX, v.targetY).filter(n => n.tile.type === TileType.ROAD || n.tile.type === TileType.HIGHWAY);
+          if (neighbors.length > 0) {
+            const next = neighbors[Math.floor(Math.random() * neighbors.length)].tile;
+            v.targetX = next.x;
+            v.targetY = next.y;
+          } else {
+            this.vehicles.splice(i, 1);
+            continue;
+          }
         }
       } else {
         v.x += (dx / dist) * v.speed;
         v.y += (dy / dist) * v.speed;
       }
 
-      // Project vehicle to screen
+      // Render vehicle sprite
       const { x: sx, y: sy } = this.camera.worldToScreen(v.x, v.y, 0);
-      this.ctx.fillStyle = v.color;
-      this.ctx.fillRect(sx - 3 * z, sy - 2 * z, 6 * z, 4 * z);
-      this.ctx.fillStyle = '#000000';
-      this.ctx.fillRect(sx - 2 * z, sy - 1 * z, 2 * z, 2 * z);
+
+      if (v.isTruck) {
+        // Semi-truck trailer & cab
+        this.ctx.fillStyle = '#e2e8f0'; // cab
+        this.ctx.fillRect(sx - 6 * z, sy - 3 * z, 5 * z, 5 * z);
+        this.ctx.fillStyle = v.color; // shipping container
+        this.ctx.fillRect(sx - 1 * z, sy - 4 * z, 10 * z, 6 * z);
+        this.ctx.fillStyle = '#000000'; // wheels
+        this.ctx.fillRect(sx - 5 * z, sy + 2 * z, 3 * z, 2 * z);
+        this.ctx.fillRect(sx + 4 * z, sy + 2 * z, 4 * z, 2 * z);
+      } else {
+        // Passenger car / taxi
+        this.ctx.fillStyle = v.color;
+        this.ctx.fillRect(sx - 3 * z, sy - 2 * z, 6 * z, 4 * z);
+        this.ctx.fillStyle = '#000000';
+        this.ctx.fillRect(sx - 2 * z, sy - 1 * z, 2 * z, 2 * z);
+      }
     }
   }
 }

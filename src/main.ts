@@ -64,14 +64,15 @@ window.addEventListener('DOMContentLoaded', () => {
 
       let desc = 'Grassland';
       if (tile.type === TileType.WATER) desc = 'River / Water';
-      else if (tile.type === TileType.ROAD) desc = `Paved Road (P:${tile.powered ? '⚡' : '❌'} W:${tile.watered ? '💧' : '❌'})`;
+      else if (tile.type === TileType.HIGHWAY) desc = 'Interstate 10 (Regional Freeway Connection)';
+      else if (tile.type === TileType.ROAD) desc = `Paved Road (Hwy:${tile.connectedToHighway ? '✅' : '❌'} P:${tile.powered ? '⚡' : '❌'} W:${tile.watered ? '💧' : '❌'})`;
       else if (tile.type === TileType.POWER_PLANT) desc = 'Coal Power Plant (Active)';
       else if (tile.type === TileType.WATER_PUMP) desc = 'Water Pumping Station';
       else if (tile.type === TileType.PARK) desc = 'Public Park (+Land Value)';
       else if (tile.building) {
         const b = tile.building;
         const stage = b.isConstructing ? 'Under Construction' : `Tier ${b.level}`;
-        const util = `P:${b.powered ? '⚡' : '❌'} W:${b.watered ? '💧' : '❌'}`;
+        const util = `Hwy:${b.hasHighwayAccess ? '✅' : '❌'} P:${b.powered ? '⚡' : '❌'} W:${b.watered ? '💧' : '❌'}`;
         desc = `${b.zone} [${stage}] Pop:${b.residents} Jobs:${b.jobs} (${util})`;
       } else if (tile.zone !== ZoneType.NONE) {
         desc = `Zoned ${tile.zone} (Awaiting Construction)`;
@@ -144,7 +145,12 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // Bulldozer
     if (tool === 'demolish') {
-      if (tile.type === TileType.WATER) return; // Cannot bulldoze natural river
+      if (tile.type === TileType.WATER) return;
+      if (tile.type === TileType.HIGHWAY) {
+        sounds.playError();
+        hud.showToast("Cannot bulldoze Interstate 10! It's state property.");
+        return;
+      }
       if (tile.type !== TileType.GRASS || tile.zone !== ZoneType.NONE || tile.building) {
         if (engine.funds < COSTS.DEMOLISH) {
           sounds.playError();
@@ -283,5 +289,5 @@ window.addEventListener('DOMContentLoaded', () => {
   }
   requestAnimationFrame(loop);
 
-  hud.showToast("Welcome to Pixel City! Lay roads and zone areas to start.");
+  hud.showToast("Connect your roads to the Interstate 10 interchange to bring citizens in!");
 });

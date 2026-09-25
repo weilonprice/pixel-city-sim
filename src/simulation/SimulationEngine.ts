@@ -17,9 +17,10 @@ export class SimulationEngine {
   public speed: number = 1; // 0, 1, 2, 5
   public tickCount: number = 0;
   public month: number = 0;
-  public year: number = 2000;
+  public year: 2000 = 2000;
 
   private months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  private warnedHighway: boolean = false;
 
   // Event callbacks for UI
   public onStatsUpdate?: () => void;
@@ -39,7 +40,7 @@ export class SimulationEngine {
     for (let s = 0; s < this.speed; s++) {
       this.tickCount++;
 
-      // 1. Update Utilities (Power & Water distribution via BFS)
+      // 1. Update Utilities & Highway Connectivity
       this.updateUtilities();
 
       // 2. Process Building Growth & RCI Demand (every 5 ticks)
@@ -81,9 +82,8 @@ export class SimulationEngine {
       }
     }
 
-    // Power BFS queue
+    // Power BFS queue & Water BFS queue
     const powerQueue: Tile[] = [];
-    // Water BFS queue
     const waterQueue: Tile[] = [];
 
     for (let x = 0; x < size; x++) {
@@ -100,14 +100,14 @@ export class SimulationEngine {
       }
     }
 
-    // Propagate Power (travels along roads and adjacent buildings up to 30 hops)
+    // Propagate Power (travels along roads, highways, and adjacent buildings)
     while (powerQueue.length > 0) {
       const curr = powerQueue.shift()!;
       const neighbors = this.grid.getNeighbors(curr.x, curr.y);
 
       for (const n of neighbors) {
         const t = n.tile;
-        if (!t.powered && (t.type === TileType.ROAD || t.type === TileType.PARK || t.type === TileType.POWER_PLANT || t.type === TileType.WATER_PUMP || t.building)) {
+        if (!t.powered && (t.type === TileType.ROAD || t.type === TileType.HIGHWAY || t.type === TileType.PARK || t.type === TileType.POWER_PLANT || t.type === TileType.WATER_PUMP || t.building)) {
           t.powered = true;
           if (t.building) t.building.powered = true;
           powerQueue.push(t);
@@ -115,7 +115,7 @@ export class SimulationEngine {
       }
     }
 
-    // Propagate Water (travels along roads and directly adjacent tiles)
+    // Propagate Water (travels along roads and directly adjacent structures)
     while (waterQueue.length > 0) {
       const curr = waterQueue.shift()!;
       const neighbors = this.grid.getNeighbors(curr.x, curr.y);
@@ -129,6 +129,9 @@ export class SimulationEngine {
         }
       }
     }
+
+    // Re-verify highway connectivity
+    this.grid.updateHighwayConnectivity();
   }
 
   /**
@@ -137,6 +140,7 @@ export class SimulationEngine {
   private processZoningAndGrowth() {
     let totalPop = 0;
     let totalJobs = 0;
+    let hasDisconnectedZones = false;
     const size = this.grid.size;
 
     for (let x = 0; x < size; x++) {
@@ -146,18 +150,22 @@ export class SimulationEngine {
         // Existing building development
         if (t.building) {
           const b = t.building;
+          b.hasHighwayAccess = this.grid.isAdjacentToHighwayConnectedRoad(x, y);
 
           // Construction progress
           if (b.isConstructing) {
-            b.progress += 25;
-            if (b.progress >= 100) {
-              b.isConstructing = false;
-              b.progress = 0;
-              this.applyBuildingCapacity(b);
+            // Require highway connection for construction crew and materials to arrive!
+            if (b.hasHighwayAccess) {
+              b.progress += 25;
+              if (b.progress >= 100) {
+                b.isConstructing = false;
+                b.progress = 0;
+                this.applyBuildingCapacity(b);
+              }
             }
           } else {
-            // Chance to upgrade if powered and watered with high demand
-            if (b.powered && b.watered && b.level < 3 && Math.random() < 0.05) {
+            // Chance to upgrade if powered, watered, and connected to the highway
+            if (b.powered && b.watered && b.hasHighwayAccess && b.level < 3 && Math.random() < 0.05) {
               const demand = b.zone === ZoneType.RESIDENTIAL ? this.demandR : (b.zone === ZoneType.COMMERCIAL ? this.demandC : this.demandI);
               if (demand > 30) {
                 b.level++;
@@ -172,8 +180,14 @@ export class SimulationEngine {
         // Empty zoned tile: check if eligible to start building
         else if (t.zone !== ZoneType.NONE && t.type === TileType.GRASS) {
           const hasRoadAccess = this.grid.isAdjacentToRoad(x, y);
+          const hasHighwayAccess = this.grid.isAdjacentToHighwayConnectedRoad(x, y);
 
-          if (hasRoadAccess) {
+          if (hasRoadAccess && !hasHighwayAccess) {
+            hasDisconnectedZones = true;
+          }
+
+          // HARD PREREQUISITE: Requires road access THAT CONNECTS TO THE HIGHWAY
+          if (hasRoadAccess && hasHighwayAccess) {
             const demand = t.zone === ZoneType.RESIDENTIAL ? this.demandR : (t.zone === ZoneType.COMMERCIAL ? this.demandC : this.demandI);
 
             // Spawn chance if demand is positive
@@ -188,6 +202,7 @@ export class SimulationEngine {
                 jobs: 0,
                 powered: t.powered,
                 watered: t.watered,
+                hasHighwayAccess: true,
                 abandoned: false,
                 style: Math.floor(Math.random() * 3)
               };
@@ -198,6 +213,13 @@ export class SimulationEngine {
           }
         }
       }
+    }
+
+    if (hasDisconnectedZones && !this.warnedHighway && this.onNotification) {
+      this.warnedHighway = true;
+      this.onNotification("⚠️ Connect roads to the Interstate 10 interchange so citizens can move in!");
+    } else if (!hasDisconnectedZones) {
+      this.warnedHighway = false;
     }
 
     this.population = totalPop;
