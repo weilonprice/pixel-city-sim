@@ -79,7 +79,7 @@ export const ORDINANCE_COSTS: Record<keyof CityOrdinances, number> = {
 export interface BuildingData {
   id: string;
   zone: ZoneType;
-  level: number; // 1 to 3
+  level: number; // 1 to 5 (Suburban, Mid-Rise, High-Rise, Luxury Skyline, Megatower)
   progress: number; // 0 to 100
   isConstructing: boolean;
   residents: number;

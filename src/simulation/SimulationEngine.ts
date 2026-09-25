@@ -356,18 +356,31 @@ export class SimulationEngine {
             }
           } else if (!b.onFire) {
             // Upgrade conditions driven by Services & Land Value
-            if (b.powered && b.watered && b.hasHighwayAccess && b.level < 3 && Math.random() < 0.05) {
+            if (b.powered && b.watered && b.hasHighwayAccess && b.level < 5 && Math.random() < 0.05) {
               const demand = b.zone === ZoneType.RESIDENTIAL ? this.demandR : (b.zone === ZoneType.COMMERCIAL ? this.demandC : this.demandI);
 
               // Level 1 -> Level 2 requires basic demand & police
               const canUpgradeL2 = b.level === 1 && demand > 25 && t.landValue > 25;
 
-              // Level 2 -> Level 3 (Skyscraper/High-Rise) requires high health, education, fire coverage, and high land value
+              // Level 2 -> Level 3 (Mid-Rise / High-Rise) requires health, education, fire coverage, and moderate land value
               const canUpgradeL3 = b.level === 2 && demand > 40 && t.landValue > 45 && t.educationCoverage > 25 && t.healthCoverage > 25 && t.fireCoverage > 20;
 
-              if (canUpgradeL2 || canUpgradeL3) {
+              // Level 3 -> Level 4 (Luxury High-Rise / Corporate Plaza / Biotech Campus) requires high land value, education, healthcare, and transit
+              const canUpgradeL4 = b.level === 3 && demand > 50 && t.landValue > 55 && t.educationCoverage > 40 && t.healthCoverage > 35 && t.fireCoverage > 30 && t.transitCoverage > 30;
+
+              // Level 4 -> Level 5 (Glass Megatower / World Trade Center / Aerospace Campus) requires premier metropolitan conditions
+              const canUpgradeL5 = b.level === 4 && demand > 65 && t.landValue > 70 && t.educationCoverage > 55 && t.healthCoverage > 45 && t.fireCoverage > 40 && t.transitCoverage > 50 && t.policeCoverage > 40;
+
+              if (canUpgradeL2 || canUpgradeL3 || canUpgradeL4 || canUpgradeL5) {
                 b.level++;
                 this.applyBuildingCapacity(b);
+                if (b.level === 5) {
+                  sounds.playSkyscraperFanfare();
+                  if (this.onNotification) {
+                    const zoneName = b.zone === ZoneType.RESIDENTIAL ? 'Apex Glass Megatower' : (b.zone === ZoneType.COMMERCIAL ? 'World Trade Megatower' : 'Aerospace Tech Campus');
+                    this.onNotification(`🏙️ Landmark Skyscraper! A monumental Tier 5 ${zoneName} now graces your skyline!`);
+                  }
+                }
               }
             }
           }
@@ -500,16 +513,16 @@ export class SimulationEngine {
     }
   }
 
-  private applyBuildingCapacity(b: BuildingData) {
+  public applyBuildingCapacity(b: BuildingData) {
     if (b.zone === ZoneType.RESIDENTIAL) {
-      b.residents = b.level === 1 ? 5 : (b.level === 2 ? 25 : 80);
+      b.residents = b.level === 1 ? 5 : (b.level === 2 ? 25 : (b.level === 3 ? 80 : (b.level === 4 ? 180 : 350)));
       b.jobs = 0;
     } else if (b.zone === ZoneType.COMMERCIAL) {
       b.residents = 0;
-      b.jobs = b.level === 1 ? 4 : (b.level === 2 ? 20 : 60);
+      b.jobs = b.level === 1 ? 4 : (b.level === 2 ? 20 : (b.level === 3 ? 60 : (b.level === 4 ? 150 : 320)));
     } else if (b.zone === ZoneType.INDUSTRIAL) {
       b.residents = 0;
-      b.jobs = b.level === 1 ? 8 : (b.level === 2 ? 30 : 90);
+      b.jobs = b.level === 1 ? 8 : (b.level === 2 ? 30 : (b.level === 3 ? 90 : (b.level === 4 ? 160 : 300)));
     }
   }
 

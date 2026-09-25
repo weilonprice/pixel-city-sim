@@ -648,8 +648,151 @@ async function runPlaytest() {
   }
   console.log('   ✅ Save & Load verified with exact state, budget, transit, weather, ordinances, milestones & road hierarchy restoration.');
 
-  // 11. Test Ambient Audio & Mute Controls
-  console.log('\n11. Testing Audio Mute Controls & Ambient Soundscape...');
+  // 11. Test High-Density Skylines & Modern Glass Towers (Tier 4 & Tier 5)
+  console.log('\n11. Testing High-Density Skylines & Modern Glass Towers (Tier 4 & Tier 5)...');
+  const skylineResult = await page.evaluate(`(() => {
+    const g = window.game;
+    const grid = g.grid;
+    const engine = g.engine;
+
+    // Pick 3 test tiles for R, C, and I
+    const rTile = grid.getTile(24, 21);
+    const cTile = grid.getTile(25, 23);
+    const iTile = grid.getTile(36, 26);
+
+    if (!rTile || !cTile || !iTile) return { success: false, reason: 'Test tiles not found' };
+
+    // Ensure power, water, road adjacency, and high service coverage
+    rTile.powered = true;
+    rTile.watered = true;
+    rTile.landValue = 90;
+    rTile.healthCoverage = 90;
+    rTile.educationCoverage = 90;
+    rTile.fireCoverage = 90;
+    rTile.policeCoverage = 90;
+    rTile.transitCoverage = 85;
+
+    cTile.powered = true;
+    cTile.watered = true;
+    cTile.landValue = 92;
+    cTile.fireCoverage = 90;
+    cTile.policeCoverage = 90;
+    cTile.transitCoverage = 88;
+
+    iTile.powered = true;
+    iTile.watered = true;
+    iTile.fireCoverage = 85;
+    iTile.policeCoverage = 85;
+    iTile.transitCoverage = 80;
+
+    // Test Residential progression to Tier 4 & Tier 5
+    rTile.building = {
+      zone: 'RESIDENTIAL',
+      level: 3,
+      residents: 80,
+      jobs: 0,
+      style: 1
+    };
+
+    engine.applyBuildingCapacity(rTile.building);
+    const rL3Cap = rTile.building.residents;
+    rTile.building.level = 4;
+    engine.applyBuildingCapacity(rTile.building);
+    const rL4Cap = rTile.building.residents;
+    rTile.building.level = 5;
+    engine.applyBuildingCapacity(rTile.building);
+    const rL5Cap = rTile.building.residents;
+
+    // Test Commercial progression
+    cTile.building = {
+      zone: 'COMMERCIAL',
+      level: 3,
+      residents: 0,
+      jobs: 60,
+      style: 1
+    };
+    cTile.building.level = 4;
+    engine.applyBuildingCapacity(cTile.building);
+    const cL4Jobs = cTile.building.jobs;
+    cTile.building.level = 5;
+    engine.applyBuildingCapacity(cTile.building);
+    const cL5Jobs = cTile.building.jobs;
+
+    // Test Industrial progression & low-pollution scaling
+    iTile.building = {
+      zone: 'INDUSTRIAL',
+      level: 3,
+      residents: 0,
+      jobs: 90,
+      style: 1
+    };
+    iTile.building.level = 4;
+    engine.applyBuildingCapacity(iTile.building);
+    const iL4Jobs = iTile.building.jobs;
+    iTile.building.level = 5;
+    engine.applyBuildingCapacity(iTile.building);
+    const iL5Jobs = iTile.building.jobs;
+
+    // Update pollution map and test clean industrial campus pollution
+    grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation, engine.fundingTransit, engine.ordinances);
+    const l5IndustrialPollution = iTile.pollution;
+
+    // Check news headlines generation
+    const newsTicker = g.hud ? g.hud.newsTicker : null;
+    const headlines = newsTicker ? newsTicker.generateHeadlines() : [];
+    const hasHighRiseHeadline = headlines.some(h => h.includes('HIGH-RISE BOOM') || h.includes('ARCHITECTURAL MARVEL'));
+
+    return {
+      success: true,
+      rL3Cap,
+      rL4Cap,
+      rL5Cap,
+      cL4Jobs,
+      cL5Jobs,
+      iL4Jobs,
+      iL5Jobs,
+      l5IndustrialPollution,
+      hasHighRiseHeadline
+    };
+  })()`) as {
+    success: boolean;
+    reason?: string;
+    rL3Cap: number;
+    rL4Cap: number;
+    rL5Cap: number;
+    cL4Jobs: number;
+    cL5Jobs: number;
+    iL4Jobs: number;
+    iL5Jobs: number;
+    l5IndustrialPollution: number;
+    hasHighRiseHeadline: boolean;
+  };
+
+  if (!skylineResult.success) {
+    throw new Error(`High-Density Skyline test failed: ${skylineResult.reason}`);
+  }
+
+  console.log(`   Residential Capacity: Tier 3 = ${skylineResult.rL3Cap}, Tier 4 (Luxury Condos) = ${skylineResult.rL4Cap}, Tier 5 (Apex Megatower) = ${skylineResult.rL5Cap}`);
+  console.log(`   Commercial Capacity: Tier 4 (Corporate Plaza) = ${skylineResult.cL4Jobs} jobs, Tier 5 (World Trade Megatower) = ${skylineResult.cL5Jobs} jobs`);
+  console.log(`   Industrial Capacity: Tier 4 (Biotech Campus) = ${skylineResult.iL4Jobs} jobs, Tier 5 (Aerospace Megafactory) = ${skylineResult.iL5Jobs} jobs`);
+  console.log(`   Tier 5 Megatower News Headline Active: ${skylineResult.hasHighRiseHeadline}`);
+
+  if (skylineResult.rL4Cap !== 180 || skylineResult.rL5Cap !== 350) {
+    throw new Error(`Residential skyscraper capacity mismatch! Expected L4=180, L5=350, got L4=${skylineResult.rL4Cap}, L5=${skylineResult.rL5Cap}`);
+  }
+  if (skylineResult.cL4Jobs !== 150 || skylineResult.cL5Jobs !== 320) {
+    throw new Error(`Commercial skyscraper jobs mismatch! Expected L4=150, L5=320, got L4=${skylineResult.cL4Jobs}, L5=${skylineResult.cL5Jobs}`);
+  }
+  if (skylineResult.iL4Jobs !== 160 || skylineResult.iL5Jobs !== 300) {
+    throw new Error(`Industrial high-tech jobs mismatch! Expected L4=160, L5=300, got L4=${skylineResult.iL4Jobs}, L5=${skylineResult.iL5Jobs}`);
+  }
+  if (!skylineResult.hasHighRiseHeadline) {
+    throw new Error('News ticker failed to generate Tier 5 megatower / high-rise boom headlines!');
+  }
+  console.log('   ✅ High-Density Skylines Tier 4 & 5 capacities, green tech campuses, and headlines verified.');
+
+  // 12. Test Ambient Audio & Mute Controls
+  console.log('\n12. Testing Audio Mute Controls & Ambient Soundscape...');
   const initialMuteIcon = await page.$eval('#btn-audio-mute', el => el.textContent);
   if (initialMuteIcon !== '🔊') throw new Error(`Expected initial audio icon 🔊, got ${initialMuteIcon}`);
 
@@ -666,13 +809,13 @@ async function runPlaytest() {
   if (unmutedIcon !== '🔊') throw new Error(`Expected unmuted icon 🔊 after M key, got ${unmutedIcon}`);
   console.log('   ✅ Audio mute controls verified via UI button and "M" shortcut.');
 
-  // 12. Test City Snapshot & Photo Tool
-  console.log('\n12. Testing City Snapshot Photo Tool...');
+  // 13. Test City Snapshot & Photo Tool
+  console.log('\n13. Testing City Snapshot Photo Tool...');
   await page.click('#btn-snapshot');
   await sleep(300);
   console.log('   ✅ Snapshot photo trigger executed with camera flash effect.');
 
-  // 12. Error assertion
+  // 14. Error assertion
   if (errors.length > 0) {
     console.error('\n❌ Uncaught errors detected:');
     errors.forEach(e => console.error(e));

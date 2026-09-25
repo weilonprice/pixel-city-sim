@@ -126,9 +126,34 @@ window.addEventListener('DOMContentLoaded', () => {
       else if (tile.building) {
         const b = tile.building;
         const fireStatus = b.onFire ? ' 🔥 ON FIRE!' : '';
-        const stage = b.isConstructing ? 'Under Construction' : `Tier ${b.level}`;
+        const buildingNames: Record<ZoneType, Record<number, string>> = {
+          [ZoneType.RESIDENTIAL]: {
+            1: 'Suburban Cottage',
+            2: 'Brick Townhouse',
+            3: 'Apartment Block',
+            4: 'Luxury High-Rise Condos',
+            5: 'Apex Glass Megatower'
+          },
+          [ZoneType.COMMERCIAL]: {
+            1: 'Corner Diner & Shops',
+            2: 'Commercial Office Block',
+            3: 'Modern Business Tower',
+            4: 'Corporate Financial Plaza',
+            5: 'World Trade Megatower'
+          },
+          [ZoneType.INDUSTRIAL]: {
+            1: 'Industrial Warehouse',
+            2: 'Assembly Plant & Factory',
+            3: 'Heavy Manufacturing Center',
+            4: 'Clean High-Tech Research Campus',
+            5: 'Aerospace & Robotics Megafactory'
+          },
+          [ZoneType.NONE]: { 1: '', 2: '', 3: '', 4: '', 5: '' }
+        };
+        const title = buildingNames[b.zone]?.[b.level] || `${b.zone} Tier ${b.level}`;
+        const stage = b.isConstructing ? 'Under Construction' : `Tier ${b.level}: ${title}`;
         const util = `Hwy:${b.hasHighwayAccess ? '✅' : '❌'} P:${b.powered ? '⚡' : '❌'} W:${b.watered ? '💧' : '❌'}`;
-        desc = `${b.zone} [${stage}] Pop:${b.residents} Jobs:${b.jobs} (${util})${fireStatus}`;
+        desc = `[${stage}] Pop:${b.residents} Jobs:${b.jobs} (${util})${fireStatus}`;
       } else if (tile.zone !== ZoneType.NONE) {
         desc = `Zoned ${tile.zone} (Awaiting Construction)`;
       }
