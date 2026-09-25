@@ -2,6 +2,23 @@ import { TileType, ZoneType, Tile, BuildingData, UPKEEP, OverlayMode } from '../
 import { Grid } from './Grid.ts';
 import { sounds } from '../core/SoundEffects.ts';
 
+export interface FinancialLedger {
+  taxRevenueR: number;
+  taxRevenueC: number;
+  taxRevenueI: number;
+  totalRevenue: number;
+
+  expenseRoads: number;
+  expenseFire: number;
+  expensePolice: number;
+  expenseHealth: number;
+  expenseEducation: number;
+  expenseUtilities: number;
+  totalExpenses: number;
+
+  netMonthly: number;
+}
+
 export class SimulationEngine {
   public grid: Grid;
   public funds: number = 20000;
@@ -26,6 +43,20 @@ export class SimulationEngine {
 
   private months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   private warnedHighway: boolean = false;
+
+  // Taxation and Department Budgets
+  public taxRateR: number = 9; // 0 to 20 %
+  public taxRateC: number = 9;
+  public taxRateI: number = 9;
+
+  public fundingRoads: number = 100; // 50 to 150 %
+  public fundingFire: number = 100;
+  public fundingPolice: number = 100;
+  public fundingHealth: number = 100;
+  public fundingEducation: number = 100;
+
+  public totalCommercialJobs: number = 0;
+  public totalIndustrialJobs: number = 0;
 
   // Event callbacks for UI
   public onStatsUpdate?: () => void;
@@ -59,8 +90,13 @@ export class SimulationEngine {
       // 1. Update Utilities & Highway Connectivity
       this.updateUtilities();
 
-      // 2. Recalculate Service Coverages (Fire, Police, Health, Education, Pollution)
-      this.grid.recalculateServiceCoverages();
+      // 2. Recalculate Service Coverages (scaled by funding)
+      this.grid.recalculateServiceCoverages(
+        this.fundingFire,
+        this.fundingPolice,
+        this.fundingHealth,
+        this.fundingEducation
+      );
 
       // 3. Process Building Growth & Fire Emergencies (every 5 ticks)
       if (this.tickCount % 5 === 0) {
@@ -150,6 +186,8 @@ export class SimulationEngine {
   private processZoningAndGrowth() {
     let totalPop = 0;
     let totalJobs = 0;
+    let commJobs = 0;
+    let indJobs = 0;
     let hasDisconnectedZones = false;
     const size = this.grid.size;
 
@@ -191,6 +229,8 @@ export class SimulationEngine {
           if (!b.onFire) {
             totalPop += b.residents;
             totalJobs += b.jobs;
+            if (b.zone === ZoneType.COMMERCIAL) commJobs += b.jobs;
+            else if (b.zone === ZoneType.INDUSTRIAL) indJobs += b.jobs;
           }
         }
         else if (t.zone !== ZoneType.NONE && t.type === TileType.GRASS) {
@@ -239,10 +279,16 @@ export class SimulationEngine {
 
     this.population = totalPop;
     this.totalJobs = totalJobs;
+    this.totalCommercialJobs = commJobs;
+    this.totalIndustrialJobs = indJobs;
 
-    this.demandR = Math.max(-80, Math.min(100, Math.floor(30 + (this.totalJobs - this.population * 0.7) * 1.5)));
-    this.demandC = Math.max(-80, Math.min(100, Math.floor(15 + (this.population * 0.35 - this.totalJobs * 0.2))));
-    this.demandI = Math.max(-80, Math.min(100, Math.floor(25 + (this.population * 0.5 - this.totalJobs * 0.6))));
+    const taxModR = (9 - this.taxRateR) * 3;
+    const taxModC = (9 - this.taxRateC) * 3;
+    const taxModI = (9 - this.taxRateI) * 3;
+
+    this.demandR = Math.max(-80, Math.min(100, Math.floor(30 + taxModR + (this.totalJobs - this.population * 0.7) * 1.5)));
+    this.demandC = Math.max(-80, Math.min(100, Math.floor(15 + taxModC + (this.population * 0.35 - this.totalJobs * 0.2))));
+    this.demandI = Math.max(-80, Math.min(100, Math.floor(25 + taxModI + (this.population * 0.5 - this.totalJobs * 0.6))));
   }
 
   /**
@@ -305,6 +351,61 @@ export class SimulationEngine {
     }
   }
 
+  public getFinancialLedger(): FinancialLedger {
+    // Tax revenue based on population and jobs scaled by tax rates (9% is neutral)
+    const taxRevenueR = Math.floor(this.population * 8 * (this.taxRateR / 9));
+    const taxRevenueC = Math.floor(this.totalCommercialJobs * 6 * (this.taxRateC / 9));
+    const taxRevenueI = Math.floor(this.totalIndustrialJobs * 6 * (this.taxRateI / 9));
+    const totalRevenue = taxRevenueR + taxRevenueC + taxRevenueI;
+
+    let baseRoads = 0;
+    let baseFire = 0;
+    let basePolice = 0;
+    let baseHealth = 0;
+    let baseEducation = 0;
+    let baseUtilities = 0;
+
+    const size = this.grid.size;
+    for (let x = 0; x < size; x++) {
+      for (let y = 0; y < size; y++) {
+        const t = this.grid.tiles[x][y];
+        if (t.type === TileType.ROAD) baseRoads += t.isBridge ? UPKEEP.BRIDGE : UPKEEP.ROAD;
+        else if (t.type === TileType.POWER_PLANT) baseUtilities += UPKEEP.POWER_PLANT;
+        else if (t.type === TileType.WATER_PUMP) baseUtilities += UPKEEP.WATER_PUMP;
+        else if (t.type === TileType.PARK) baseUtilities += UPKEEP.PARK;
+        else if (t.type === TileType.FIRE_STATION) baseFire += UPKEEP.FIRE_STATION;
+        else if (t.type === TileType.POLICE_STATION) basePolice += UPKEEP.POLICE_STATION;
+        else if (t.type === TileType.HOSPITAL) baseHealth += UPKEEP.HOSPITAL;
+        else if (t.type === TileType.SCHOOL) baseEducation += UPKEEP.SCHOOL;
+      }
+    }
+
+    const expenseRoads = Math.round(baseRoads * (this.fundingRoads / 100));
+    const expenseFire = Math.round(baseFire * (this.fundingFire / 100));
+    const expensePolice = Math.round(basePolice * (this.fundingPolice / 100));
+    const expenseHealth = Math.round(baseHealth * (this.fundingHealth / 100));
+    const expenseEducation = Math.round(baseEducation * (this.fundingEducation / 100));
+    const expenseUtilities = Math.round(baseUtilities);
+
+    const totalExpenses = expenseRoads + expenseFire + expensePolice + expenseHealth + expenseEducation + expenseUtilities;
+    const netMonthly = totalRevenue - totalExpenses;
+
+    return {
+      taxRevenueR,
+      taxRevenueC,
+      taxRevenueI,
+      totalRevenue,
+      expenseRoads,
+      expenseFire,
+      expensePolice,
+      expenseHealth,
+      expenseEducation,
+      expenseUtilities,
+      totalExpenses,
+      netMonthly
+    };
+  }
+
   private processMonthlyFinances() {
     this.month++;
     if (this.month >= 12) {
@@ -312,33 +413,15 @@ export class SimulationEngine {
       this.year++;
     }
 
-    const taxIncome = Math.floor(this.population * 8 + this.totalJobs * 6);
+    const ledger = this.getFinancialLedger();
+    this.funds += ledger.netMonthly;
 
-    let expenses = 0;
-    const size = this.grid.size;
-    for (let x = 0; x < size; x++) {
-      for (let y = 0; y < size; y++) {
-        const t = this.grid.tiles[x][y];
-        if (t.type === TileType.ROAD) expenses += t.isBridge ? UPKEEP.BRIDGE : UPKEEP.ROAD;
-        else if (t.type === TileType.POWER_PLANT) expenses += UPKEEP.POWER_PLANT;
-        else if (t.type === TileType.WATER_PUMP) expenses += UPKEEP.WATER_PUMP;
-        else if (t.type === TileType.PARK) expenses += UPKEEP.PARK;
-        else if (t.type === TileType.FIRE_STATION) expenses += UPKEEP.FIRE_STATION;
-        else if (t.type === TileType.POLICE_STATION) expenses += UPKEEP.POLICE_STATION;
-        else if (t.type === TileType.HOSPITAL) expenses += UPKEEP.HOSPITAL;
-        else if (t.type === TileType.SCHOOL) expenses += UPKEEP.SCHOOL;
-      }
-    }
-
-    const netIncome = taxIncome - Math.floor(expenses);
-    this.funds += netIncome;
-
-    if (netIncome > 0) {
+    if (ledger.netMonthly > 0) {
       sounds.playCoin();
     }
 
     if (this.onNotification && (this.month === 0)) {
-      this.onNotification(`Year ${this.year} Financial Report: Net ${netIncome >= 0 ? '+' : ''}$${netIncome}`);
+      this.onNotification(`Year ${this.year} Financial Report: Net ${ledger.netMonthly >= 0 ? '+' : ''}$${ledger.netMonthly}`);
     }
   }
 
@@ -350,9 +433,19 @@ export class SimulationEngine {
         funds: this.funds,
         population: this.population,
         totalJobs: this.totalJobs,
+        totalCommercialJobs: this.totalCommercialJobs,
+        totalIndustrialJobs: this.totalIndustrialJobs,
         demandR: this.demandR,
         demandC: this.demandC,
         demandI: this.demandI,
+        taxRateR: this.taxRateR,
+        taxRateC: this.taxRateC,
+        taxRateI: this.taxRateI,
+        fundingRoads: this.fundingRoads,
+        fundingFire: this.fundingFire,
+        fundingPolice: this.fundingPolice,
+        fundingHealth: this.fundingHealth,
+        fundingEducation: this.fundingEducation,
         month: this.month,
         year: this.year,
         gameHour: this.gameHour,
@@ -399,9 +492,20 @@ export class SimulationEngine {
       this.gameHour = data.gameHour || 12;
       this.population = data.population !== undefined ? data.population : 0;
       this.totalJobs = data.totalJobs !== undefined ? data.totalJobs : 0;
+      this.totalCommercialJobs = data.totalCommercialJobs !== undefined ? data.totalCommercialJobs : 0;
+      this.totalIndustrialJobs = data.totalIndustrialJobs !== undefined ? data.totalIndustrialJobs : 0;
       this.demandR = data.demandR !== undefined ? data.demandR : 30;
       this.demandC = data.demandC !== undefined ? data.demandC : 15;
       this.demandI = data.demandI !== undefined ? data.demandI : 25;
+
+      if (data.taxRateR !== undefined) this.taxRateR = data.taxRateR;
+      if (data.taxRateC !== undefined) this.taxRateC = data.taxRateC;
+      if (data.taxRateI !== undefined) this.taxRateI = data.taxRateI;
+      if (data.fundingRoads !== undefined) this.fundingRoads = data.fundingRoads;
+      if (data.fundingFire !== undefined) this.fundingFire = data.fundingFire;
+      if (data.fundingPolice !== undefined) this.fundingPolice = data.fundingPolice;
+      if (data.fundingHealth !== undefined) this.fundingHealth = data.fundingHealth;
+      if (data.fundingEducation !== undefined) this.fundingEducation = data.fundingEducation;
 
       for (let x = 0; x < this.grid.size; x++) {
         for (let y = 0; y < this.grid.size; y++) {
@@ -433,20 +537,31 @@ export class SimulationEngine {
       // Re-verify population & jobs tally from actual buildings
       let totalPop = 0;
       let totalJobs = 0;
+      let commJobs = 0;
+      let indJobs = 0;
       for (let x = 0; x < this.grid.size; x++) {
         for (let y = 0; y < this.grid.size; y++) {
           const b = this.grid.tiles[x][y].building;
           if (b && !b.onFire && !b.isConstructing) {
             totalPop += b.residents;
             totalJobs += b.jobs;
+            if (b.zone === ZoneType.COMMERCIAL) commJobs += b.jobs;
+            else if (b.zone === ZoneType.INDUSTRIAL) indJobs += b.jobs;
           }
         }
       }
       this.population = totalPop;
       this.totalJobs = totalJobs;
+      this.totalCommercialJobs = commJobs;
+      this.totalIndustrialJobs = indJobs;
 
       this.updateUtilities();
-      this.grid.recalculateServiceCoverages();
+      this.grid.recalculateServiceCoverages(
+        this.fundingFire,
+        this.fundingPolice,
+        this.fundingHealth,
+        this.fundingEducation
+      );
 
       if (this.onStatsUpdate) this.onStatsUpdate();
       if (this.onNotification) this.onNotification('📂 City loaded successfully!');

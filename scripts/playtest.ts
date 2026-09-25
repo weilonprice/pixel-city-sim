@@ -209,10 +209,117 @@ async function runPlaytest() {
   }
   console.log('   ✅ All 7 data overlays rendered with zero shader/canvas issues.');
 
-  // 7. Test Save and Load Persistence
+  // 7. Test Retro News Ticker
+  console.log('\n7. Testing Retro News Ticker...');
+  const tickerText = await page.$eval('#ticker-text', el => el.textContent);
+  console.log(`   Initial Headline: "${tickerText}"`);
+  if (!tickerText || tickerText.length < 5) {
+    throw new Error('News ticker text is empty or missing!');
+  }
+
+  // Click ticker to cycle headline
+  await page.click('#news-ticker');
+  await sleep(300);
+  const nextHeadline = await page.$eval('#ticker-text', el => el.textContent);
+  console.log(`   Cycled Headline: "${nextHeadline}"`);
+  console.log('   ✅ News Ticker displays dynamic headlines and responds to clicks.');
+
+  // 8. Test Retro Budget & Tax Sheet Modal
+  console.log('\n8. Testing Municipal Budget & Tax Modal...');
+  
+  // Test opening via B key
+  await page.keyboard.press('KeyB');
+  await sleep(300);
+  let isBudgetOpen = await page.$eval('#budget-modal-overlay', el => !el.classList.contains('hidden'));
+  if (!isBudgetOpen) throw new Error('Budget modal failed to open with B key');
+  console.log('   ✅ Budget modal opened via "B" key shortcut.');
+
+  // Close via Escape key
+  await page.keyboard.press('Escape');
+  await sleep(300);
+  isBudgetOpen = await page.$eval('#budget-modal-overlay', el => !el.classList.contains('hidden'));
+  if (isBudgetOpen) throw new Error('Budget modal failed to close with Escape key');
+  console.log('   ✅ Budget modal closed via "Escape" key.');
+
+  // Open via clicking #btn-budget
+  await page.click('#btn-budget');
+  await sleep(300);
+  isBudgetOpen = await page.$eval('#budget-modal-overlay', el => !el.classList.contains('hidden'));
+  if (!isBudgetOpen) throw new Error('Budget modal failed to open via #btn-budget');
+  console.log('   ✅ Budget modal opened via #btn-budget.');
+  await page.screenshot({ path: path.join(projectRoot, 'playtest_budget_modal.png') });
+
+  // Verify financial ledger values
+  const totalRev = await page.$eval('#budget-total-rev', el => el.textContent);
+  const totalExp = await page.$eval('#budget-total-exp', el => el.textContent);
+  const netFlow = await page.$eval('#budget-net-flow', el => el.textContent);
+  console.log(`   Ledger breakdown: Revenue = ${totalRev}, Expenses = ${totalExp}, Net Cash Flow = ${netFlow}`);
+
+  // Test slider adjustments & reactive demand/radius scaling
+  const budgetTestResult = await page.evaluate(`(() => {
+    const game = window.game;
+    const engine = game.engine;
+    const initialDemandR = engine.demandR;
+
+    // Cut residential tax to 4% -> Demand should surge
+    engine.taxRateR = 4;
+    engine.tick();
+    const lowTaxDemandR = engine.demandR;
+
+    // Raise residential tax to 18% -> Demand should drop
+    engine.taxRateR = 18;
+    engine.tick();
+    const highTaxDemandR = engine.demandR;
+
+    // Test fire department funding scaling
+    engine.fundingFire = 140;
+    engine.grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation);
+    const boostedRadius = Math.max(4, Math.round(14 * (engine.fundingFire / 100)));
+
+    engine.fundingFire = 60;
+    engine.grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation);
+    const cutRadius = Math.max(4, Math.round(14 * (engine.fundingFire / 100)));
+
+    return {
+      initialDemandR,
+      lowTaxDemandR,
+      highTaxDemandR,
+      boostedRadius,
+      cutRadius
+    };
+  })()`) as { initialDemandR: number; lowTaxDemandR: number; highTaxDemandR: number; boostedRadius: number; cutRadius: number };
+
+  console.log(`   Tax Demand Response: at 4% = ${budgetTestResult.lowTaxDemandR}, at 18% = ${budgetTestResult.highTaxDemandR}`);
+  if (budgetTestResult.lowTaxDemandR <= budgetTestResult.highTaxDemandR) {
+    throw new Error('Tax rate did not properly affect residential demand!');
+  }
+  console.log(`   Fire Coverage Radius: at 140% = ${budgetTestResult.boostedRadius} tiles, at 60% = ${budgetTestResult.cutRadius} tiles`);
+  if (budgetTestResult.boostedRadius <= budgetTestResult.cutRadius) {
+    throw new Error('Department funding did not scale coverage radius!');
+  }
+
+  // Click Reset button to restore defaults
+  await page.click('#budget-btn-reset');
+  await sleep(200);
+  const resetTaxR = await page.$eval('#val-tax-r', el => el.textContent);
+  if (resetTaxR !== '9%') throw new Error(`Budget reset failed! Expected 9%, got ${resetTaxR}`);
+  console.log('   ✅ Reset button restored neutral 9% tax rates and 100% funding.');
+
+  // Close modal via Done button
+  await page.click('#budget-btn-apply');
+  await sleep(200);
+
+  // 9. Test Save and Load Persistence (including Budget & Tax rates)
   await page.click('#btn-pause'); // Pause simulation for deterministic save snapshot
   const popBeforeSave = await page.$eval('#pop-value', el => el.textContent);
-  console.log(`\n6. Testing LocalStorage Save & Load (Population at Save: ${popBeforeSave})...`);
+  console.log(`\n9. Testing LocalStorage Save & Load (Population at Save: ${popBeforeSave})...`);
+  
+  // Set custom tax rate before save
+  await page.evaluate(`(() => {
+    window.game.engine.taxRateR = 7;
+    window.game.engine.fundingFire = 125;
+  })()`);
+
   await page.click('#btn-save');
   await sleep(400);
 
@@ -228,9 +335,20 @@ async function runPlaytest() {
   if (restoredPop !== popBeforeSave) {
     throw new Error(`Save/Load mismatch! Expected ${popBeforeSave}, got ${restoredPop}`);
   }
-  console.log('   ✅ Save & Load verified with exact state restoration.');
 
-  // 8. Error assertion
+  const restoredRates = await page.evaluate(`(() => {
+    return {
+      taxRateR: window.game.engine.taxRateR,
+      fundingFire: window.game.engine.fundingFire
+    };
+  })()`) as { taxRateR: number; fundingFire: number };
+  console.log(`   Restored Tax Rate R: ${restoredRates.taxRateR}%, Fire Funding: ${restoredRates.fundingFire}%`);
+  if (restoredRates.taxRateR !== 7 || restoredRates.fundingFire !== 125) {
+    throw new Error('Save/load failed to restore budget tax/funding rates!');
+  }
+  console.log('   ✅ Save & Load verified with exact state & budget restoration.');
+
+  // 10. Error assertion
   if (errors.length > 0) {
     console.error('\n❌ Uncaught errors detected:');
     errors.forEach(e => console.error(e));

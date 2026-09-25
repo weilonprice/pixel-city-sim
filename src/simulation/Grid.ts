@@ -211,8 +211,18 @@ export class Grid {
   /**
    * Spatial coverage recalculation for all services & environmental heatmaps
    */
-  public recalculateServiceCoverages() {
+  public recalculateServiceCoverages(
+    fundingFire: number = 100,
+    fundingPolice: number = 100,
+    fundingHealth: number = 100,
+    fundingEducation: number = 100
+  ) {
     const size = this.size;
+
+    const fireRadius = Math.max(4, Math.round(14 * (fundingFire / 100)));
+    const policeRadius = Math.max(4, Math.round(14 * (fundingPolice / 100)));
+    const healthRadius = Math.max(5, Math.round(16 * (fundingHealth / 100)));
+    const educationRadius = Math.max(4, Math.round(14 * (fundingEducation / 100)));
 
     // Reset temporary layers
     for (let x = 0; x < size; x++) {
@@ -232,33 +242,33 @@ export class Grid {
       for (let y = 0; y < size; y++) {
         const t = this.tiles[x][y];
 
-        // Fire Station Coverage (Radius 14)
+        // Fire Station Coverage
         if (t.type === TileType.FIRE_STATION && t.powered && t.watered) {
-          this.applyRadialEffect(x, y, 14, (target, dist) => {
-            target.fireCoverage = Math.max(target.fireCoverage, Math.round(100 * (1 - dist / 14)));
+          this.applyRadialEffect(x, y, fireRadius, (target, dist) => {
+            target.fireCoverage = Math.max(target.fireCoverage, Math.round(100 * (1 - dist / fireRadius)));
           });
         }
 
-        // Police Station Coverage (Radius 14)
+        // Police Station Coverage
         if (t.type === TileType.POLICE_STATION && t.powered && t.watered) {
-          this.applyRadialEffect(x, y, 14, (target, dist) => {
-            target.policeCoverage = Math.max(target.policeCoverage, Math.round(100 * (1 - dist / 14)));
+          this.applyRadialEffect(x, y, policeRadius, (target, dist) => {
+            target.policeCoverage = Math.max(target.policeCoverage, Math.round(100 * (1 - dist / policeRadius)));
           });
         }
 
-        // Hospital / Clinic Coverage (Radius 16)
+        // Hospital / Clinic Coverage
         if (t.type === TileType.HOSPITAL && t.powered && t.watered) {
-          this.applyRadialEffect(x, y, 16, (target, dist) => {
-            target.healthCoverage = Math.max(target.healthCoverage, Math.round(100 * (1 - dist / 16)));
-            target.landValue += Math.round(15 * (1 - dist / 16));
+          this.applyRadialEffect(x, y, healthRadius, (target, dist) => {
+            target.healthCoverage = Math.max(target.healthCoverage, Math.round(100 * (1 - dist / healthRadius)));
+            target.landValue += Math.round(15 * (1 - dist / healthRadius));
           });
         }
 
-        // School Coverage (Radius 14)
+        // School Coverage
         if (t.type === TileType.SCHOOL && t.powered && t.watered) {
-          this.applyRadialEffect(x, y, 14, (target, dist) => {
-            target.educationCoverage = Math.max(target.educationCoverage, Math.round(100 * (1 - dist / 14)));
-            target.landValue += Math.round(12 * (1 - dist / 14));
+          this.applyRadialEffect(x, y, educationRadius, (target, dist) => {
+            target.educationCoverage = Math.max(target.educationCoverage, Math.round(100 * (1 - dist / educationRadius)));
+            target.landValue += Math.round(12 * (1 - dist / educationRadius));
           });
         }
 
