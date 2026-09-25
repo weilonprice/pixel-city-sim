@@ -99,6 +99,12 @@ export class MiniMap {
           color = '#0284c7'; // Metro Cyan / Transit Blue
         } else if (t.type === TileType.BUS_STOP) {
           color = '#38bdf8'; // Bus stop beacon
+        } else if (t.type === TileType.MAYORS_MANSION) {
+          color = '#f59e0b'; // Mayor's Mansion Gold
+        } else if (t.type === TileType.CITY_HALL) {
+          color = '#fbbf24'; // City Hall Marble Gold
+        } else if (t.type === TileType.GRAND_CENTRAL) {
+          color = '#a855f7'; // Grand Central Purple
         } else if (
           t.type === TileType.FIRE_STATION ||
           t.type === TileType.POLICE_STATION ||

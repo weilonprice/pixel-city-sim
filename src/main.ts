@@ -115,6 +115,9 @@ window.addEventListener('DOMContentLoaded', () => {
       else if (tile.type === TileType.PARK) desc = 'Public Park (+30 Land Value)';
       else if (tile.type === TileType.BUS_DEPOT) desc = `Municipal Bus Depot (Fleet Dispatch HQ • Upkeep $15/mo • P:${tile.powered ? '⚡' : '❌'} W:${tile.watered ? '💧' : '❌'})`;
       else if (tile.type === TileType.BUS_STOP) desc = `Roadside Bus Stop (Radius: 8 • Transit Cov: ${tile.transitCoverage}% • Upkeep $1/mo)`;
+      else if (tile.type === TileType.MAYORS_MANSION) desc = `Mayor's Historic Mansion (Civic Landmark • +10 City Demand • +25 Land Value • Upkeep $20/mo • P:${tile.powered ? '⚡' : '❌'} W:${tile.watered ? '💧' : '❌'})`;
+      else if (tile.type === TileType.CITY_HALL) desc = `Majestic City Hall (Seat of Municipal Govt • -10% All City Upkeeps • +35 Land Value • Upkeep $50/mo • P:${tile.powered ? '⚡' : '❌'} W:${tile.watered ? '💧' : '❌'})`;
+      else if (tile.type === TileType.GRAND_CENTRAL) desc = `Grand Central Terminal (Metropolitan Transit Monument • +25 Commercial Demand • Upkeep $100/mo • P:${tile.powered ? '⚡' : '❌'} W:${tile.watered ? '💧' : '❌'})`;
       else if (tile.building) {
         const b = tile.building;
         const fireStatus = b.onFire ? ' 🔥 ON FIRE!' : '';
@@ -271,6 +274,8 @@ window.addEventListener('DOMContentLoaded', () => {
         tile.building = undefined;
         grid.updateRoadAndNeighbors(x, y);
         engine.updateUtilities();
+        engine.updateRewardMetrics();
+        engine.updateTransitMetrics();
         grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation, engine.fundingTransit, engine.ordinances);
       }
       return;
@@ -547,6 +552,85 @@ window.addEventListener('DOMContentLoaded', () => {
       tile.zone = ZoneType.NONE;
       tile.building = undefined;
       grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation, engine.fundingTransit, engine.ordinances);
+      return;
+    }
+
+    // Mayor's Historic Mansion
+    if (tool === 'mayors-mansion') {
+      if (tile.type !== TileType.GRASS) return;
+      if (!engine.unlockedMilestones.includes('town')) {
+        sounds.playError();
+        hud.showToast("🔒 Mayor's Mansion requires Booming Town (500 Pop) to unlock!");
+        return;
+      }
+      if (engine.funds < COSTS.MAYORS_MANSION) {
+        sounds.playError();
+        hud.showToast("Not enough funds for Mayor's Mansion ($1,000)!");
+        return;
+      }
+      engine.funds -= COSTS.MAYORS_MANSION;
+      sounds.playBuild();
+      sounds.playCivicCheer();
+      tile.type = TileType.MAYORS_MANSION;
+      tile.zone = ZoneType.NONE;
+      tile.building = undefined;
+      engine.updateUtilities();
+      engine.updateRewardMetrics();
+      grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation, engine.fundingTransit, engine.ordinances);
+      hud.showToast("🏛️ The Mayor's Historic Mansion has been inaugurated! (+10 Demand, +25 Land Value)");
+      return;
+    }
+
+    // Majestic City Hall
+    if (tool === 'city-hall') {
+      if (tile.type !== TileType.GRASS) return;
+      if (!engine.unlockedMilestones.includes('city')) {
+        sounds.playError();
+        hud.showToast("🔒 City Hall requires Prosperous City (1,500 Pop) to unlock!");
+        return;
+      }
+      if (engine.funds < COSTS.CITY_HALL) {
+        sounds.playError();
+        hud.showToast("Not enough funds for City Hall ($2,500)!");
+        return;
+      }
+      engine.funds -= COSTS.CITY_HALL;
+      sounds.playBuild();
+      sounds.playCivicCheer();
+      tile.type = TileType.CITY_HALL;
+      tile.zone = ZoneType.NONE;
+      tile.building = undefined;
+      engine.updateUtilities();
+      engine.updateRewardMetrics();
+      grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation, engine.fundingTransit, engine.ordinances);
+      hud.showToast("🏛️ Majestic City Hall established! (-10% Municipal Department Expenses)");
+      return;
+    }
+
+    // Grand Central Terminal
+    if (tool === 'grand-central') {
+      if (tile.type !== TileType.GRASS) return;
+      if (!engine.unlockedMilestones.includes('metropolis')) {
+        sounds.playError();
+        hud.showToast("🔒 Grand Central requires Grand Metropolis (5,000 Pop) to unlock!");
+        return;
+      }
+      if (engine.funds < COSTS.GRAND_CENTRAL) {
+        sounds.playError();
+        hud.showToast("Not enough funds for Grand Central Terminal ($5,000)!");
+        return;
+      }
+      engine.funds -= COSTS.GRAND_CENTRAL;
+      sounds.playBuild();
+      sounds.playCivicCheer();
+      tile.type = TileType.GRAND_CENTRAL;
+      tile.zone = ZoneType.NONE;
+      tile.building = undefined;
+      engine.updateUtilities();
+      engine.updateRewardMetrics();
+      engine.updateTransitMetrics();
+      grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation, engine.fundingTransit, engine.ordinances);
+      hud.showToast("🚉 Grand Central Terminal opened! (+25 Commercial Demand, Max Transit Reach)");
       return;
     }
   }

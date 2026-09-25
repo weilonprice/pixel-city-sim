@@ -306,6 +306,87 @@ class SoundManager {
     whiteNoise.start(t);
   }
 
+  // Triumphant Population Milestone Fanfare
+  public playMilestoneFanfare() {
+    if (this.isMuted) return;
+    this.initCtx();
+    if (!this.ctx || !this.masterGain) return;
+
+    const t = this.ctx.currentTime;
+    const notes = [
+      { f: 261.63, delay: 0.00, dur: 0.12 }, // C4
+      { f: 329.63, delay: 0.12, dur: 0.12 }, // E4
+      { f: 392.00, delay: 0.24, dur: 0.12 }, // G4
+      { f: 523.25, delay: 0.36, dur: 0.20 }, // C5
+      { f: 392.00, delay: 0.56, dur: 0.12 }, // G4
+      { f: 523.25, delay: 0.68, dur: 0.45 }  // C5 (Hold)
+    ];
+
+    notes.forEach(n => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(n.f, t + n.delay);
+
+      gain.gain.setValueAtTime(0.08, t + n.delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + n.delay + n.dur);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+      osc.start(t + n.delay);
+      osc.stop(t + n.delay + n.dur);
+    });
+
+    // Sustained high chord accompaniment at 0.68s
+    [659.25, 783.99, 1046.50].forEach(f => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(f, t + 0.68);
+      gain.gain.setValueAtTime(0.05, t + 0.68);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+      osc.start(t + 0.68);
+      osc.stop(t + 1.2);
+    });
+  }
+
+  // Civic Celebration Cheer (Applause + crowd cheer)
+  public playCivicCheer() {
+    if (this.isMuted) return;
+    this.initCtx();
+    if (!this.ctx || !this.masterGain) return;
+
+    const t = this.ctx.currentTime;
+    const dur = 0.8;
+    const bufferSize = Math.floor(this.ctx.sampleRate * dur);
+    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      output[i] = (Math.random() * 2 - 1) * Math.sin((i / bufferSize) * Math.PI);
+    }
+
+    const whiteNoise = this.ctx.createBufferSource();
+    whiteNoise.buffer = noiseBuffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(900, t);
+    filter.frequency.linearRampToValueAtTime(1400, t + 0.4);
+    filter.Q.setValueAtTime(1.0, t);
+
+    const cheerGain = this.ctx.createGain();
+    cheerGain.gain.setValueAtTime(0.06, t);
+    cheerGain.gain.linearRampToValueAtTime(0.001, t + dur);
+
+    whiteNoise.connect(filter);
+    filter.connect(cheerGain);
+    cheerGain.connect(this.masterGain);
+
+    whiteNoise.start(t);
+  }
+
   // Emergency Siren wail
   public playSiren() {
     if (this.isMuted) return;

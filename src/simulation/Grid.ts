@@ -324,6 +324,29 @@ export class Grid {
           });
         }
 
+        // Mayor's Historic Mansion (Civic Prestige & High Land Value, Radius 10)
+        if (t.type === TileType.MAYORS_MANSION && t.powered && t.watered) {
+          this.applyRadialEffect(x, y, 10, (target, dist) => {
+            target.landValue = Math.min(100, target.landValue + Math.round(25 * (1 - dist / 10)));
+          });
+        }
+
+        // City Hall (Municipal Headquarters & Public Stability, Radius 12)
+        if (t.type === TileType.CITY_HALL && t.powered && t.watered) {
+          this.applyRadialEffect(x, y, 12, (target, dist) => {
+            target.landValue = Math.min(100, target.landValue + Math.round(35 * (1 - dist / 12)));
+            target.policeCoverage = Math.max(target.policeCoverage, Math.round(60 * (1 - dist / 12)));
+          });
+        }
+
+        // Grand Central Terminal (Iconic Metropolitan Transit Hub, Radius 16)
+        if (t.type === TileType.GRAND_CENTRAL && t.powered && t.watered) {
+          this.applyRadialEffect(x, y, 16, (target, dist) => {
+            target.transitCoverage = Math.max(target.transitCoverage, Math.round(100 * (1 - dist / 16)));
+            target.landValue = Math.min(100, target.landValue + Math.round(40 * (1 - dist / 16)));
+          });
+        }
+
         // Pollution from Industrial Zones & Coal Power Plants (Radius 9)
         if (t.type === TileType.POWER_PLANT || (t.building && t.building.zone === ZoneType.INDUSTRIAL)) {
           let intensity = t.type === TileType.POWER_PLANT ? 70 : 45;

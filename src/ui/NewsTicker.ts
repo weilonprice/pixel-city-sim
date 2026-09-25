@@ -206,6 +206,17 @@ export class NewsTicker {
       list.push(`🌆 Bustling metropolis: Population reaches ${this.engine.population} with ${this.engine.totalJobs} active jobs!`);
     }
 
+    // Civic Rewards & Landmarks
+    if (this.engine.hasMayorsMansion) {
+      list.push("🏛️ CIVIC PRIDE: Citizens marvel at the stately Mayor's Historic Mansion in the civic district!");
+    }
+    if (this.engine.hasCityHall) {
+      list.push("🏛️ CITY HALL IN SESSION: Administrative reforms achieve a 10% efficiency saving across all municipal departments!");
+    }
+    if (this.engine.hasGrandCentral) {
+      list.push("🚉 GRAND CENTRAL TERMINAL: Thousands of regional travelers stream through the monumental Beaux-Arts concourse!");
+    }
+
     // 7. Classic Humorous Headlines
     list.push(...this.humorHeadlines);
 

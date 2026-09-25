@@ -173,6 +173,12 @@ export class PixelRenderer {
       this.drawBusDepot(sx, sy, halfW, halfH);
     } else if (tile.type === TileType.BUS_STOP) {
       this.drawBusStop(sx, sy, halfW, halfH);
+    } else if (tile.type === TileType.MAYORS_MANSION) {
+      this.drawMayorsMansion(sx, sy, halfW, halfH);
+    } else if (tile.type === TileType.CITY_HALL) {
+      this.drawCityHall(sx, sy, halfW, halfH);
+    } else if (tile.type === TileType.GRAND_CENTRAL) {
+      this.drawGrandCentral(sx, sy, halfW, halfH);
     } else if (tile.building) {
       this.drawBuilding(sx, sy, halfW, halfH, tile);
     }
@@ -1015,6 +1021,392 @@ export class PixelRenderer {
       this.ctx.arc(sx - 1 * z, sy - 9 * z, 2 * z, 0, Math.PI * 2);
       this.ctx.fill();
       this.ctx.fillRect(sx - 2.5 * z, sy - 7 * z, 3 * z, 5 * z);
+    }
+  }
+
+  private drawMayorsMansion(sx: number, sy: number, hw: number, hh: number) {
+    const z = this.camera.zoom;
+    const ctx = this.ctx;
+
+    // 1. Manicured Estate Grounds & Brick Courtyard
+    ctx.fillStyle = '#1e3f1a';
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - hh * 0.9);
+    ctx.lineTo(sx + hw * 0.9, sy);
+    ctx.lineTo(sx, sy + hh * 0.9);
+    ctx.lineTo(sx - hw * 0.9, sy);
+    ctx.closePath();
+    ctx.fill();
+
+    // Wrought iron black fence along perimeter
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = Math.max(1, 1.2 * z);
+    ctx.stroke();
+
+    // Cobblestone semi-circular driveway
+    ctx.fillStyle = '#64748b';
+    ctx.beginPath();
+    ctx.ellipse(sx, sy + 3 * z, 14 * z, 7 * z, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Circular stone fountain in center of courtyard
+    ctx.fillStyle = '#94a3b8';
+    ctx.beginPath();
+    ctx.ellipse(sx, sy + 3 * z, 5 * z, 2.5 * z, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#38bdf8';
+    ctx.beginPath();
+    ctx.ellipse(sx, sy + 3 * z, 3.5 * z, 1.8 * z, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Animated water fountain jet
+    const jetH = (4 + Math.sin(this.animFrame * 0.2) * 1.5) * z;
+    ctx.strokeStyle = '#bae6fd';
+    ctx.lineWidth = Math.max(1, 1.5 * z);
+    ctx.beginPath();
+    ctx.moveTo(sx, sy + 3 * z);
+    ctx.lineTo(sx, sy + 3 * z - jetH);
+    ctx.stroke();
+
+    // 2. Main Colonial Manor House (2.5 Stories)
+    const houseH = 34 * z;
+    this.drawIsometricBox(sx, sy - 6 * z, hw * 0.65, hh * 0.55, houseH, '#b91c1c', '#991b1b', '#7f1d1d');
+
+    // White Corner Quoins
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(sx - hw * 0.65, sy - houseH - 6 * z, 2 * z, houseH);
+    ctx.fillRect(sx + hw * 0.65 - 2 * z, sy - houseH - 6 * z, 2 * z, houseH);
+
+    // Front Portico with 4 White Corinthian Columns
+    const porticoW = 12 * z;
+    const porticoH = 18 * z;
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(sx - porticoW / 2, sy - 6 * z - porticoH, porticoW, 2.5 * z); // Balcony floor
+    ctx.fillRect(sx - porticoW / 2 + 1 * z, sy - 6 * z, 1.5 * z, -porticoH); // Left column
+    ctx.fillRect(sx + porticoW / 2 - 2.5 * z, sy - 6 * z, 1.5 * z, -porticoH); // Right column
+    ctx.fillRect(sx - 2 * z, sy - 6 * z, 1.5 * z, -porticoH); // Center-left column
+    ctx.fillRect(sx + 0.5 * z, sy - 6 * z, 1.5 * z, -porticoH); // Center-right column
+
+    // Mahogany Front Door with brass knocker
+    ctx.fillStyle = '#451a03';
+    ctx.fillRect(sx - 3 * z, sy - 6 * z - 10 * z, 6 * z, 10 * z);
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillRect(sx + 1 * z, sy - 6 * z - 5 * z, 1 * z, 1 * z);
+
+    // Windows with dark shutters & warm golden interior glow
+    const winColor = (this.engine.gameHour >= 19 || this.engine.gameHour <= 6) ? '#fef08a' : '#bae6fd';
+    [-11 * z, 7 * z].forEach(wx => {
+      // 1st Floor
+      ctx.fillStyle = '#064e3b'; // Green shutters
+      ctx.fillRect(sx + wx - 1 * z, sy - 6 * z - 12 * z, 6 * z, 7 * z);
+      ctx.fillStyle = winColor;
+      ctx.fillRect(sx + wx, sy - 6 * z - 11 * z, 4 * z, 5 * z);
+
+      // 2nd Floor
+      ctx.fillStyle = '#064e3b';
+      ctx.fillRect(sx + wx - 1 * z, sy - 6 * z - 24 * z, 6 * z, 7 * z);
+      ctx.fillStyle = winColor;
+      ctx.fillRect(sx + wx, sy - 6 * z - 23 * z, 4 * z, 5 * z);
+    });
+
+    // 3. Mansard Slate Roof
+    const roofY = sy - 6 * z - houseH;
+    ctx.fillStyle = '#334155';
+    ctx.beginPath();
+    ctx.moveTo(sx - hw * 0.7, roofY);
+    ctx.lineTo(sx - hw * 0.45, roofY - 14 * z);
+    ctx.lineTo(sx + hw * 0.45, roofY - 14 * z);
+    ctx.lineTo(sx + hw * 0.7, roofY);
+    ctx.closePath();
+    ctx.fill();
+
+    // Twin Brick Chimneys with gentle puffing smoke
+    [-10 * z, 8 * z].forEach(cx => {
+      ctx.fillStyle = '#7f1d1d';
+      ctx.fillRect(sx + cx, roofY - 20 * z, 4 * z, 10 * z);
+      ctx.fillStyle = '#450a0a';
+      ctx.fillRect(sx + cx - 0.5 * z, roofY - 21 * z, 5 * z, 2 * z);
+
+      // Chimney smoke
+      const smokeOffset = ((this.animFrame * 0.4 + Math.abs(cx)) % 15) * z;
+      ctx.fillStyle = 'rgba(226, 232, 240, 0.45)';
+      ctx.beginPath();
+      ctx.arc(sx + cx + 2 * z + Math.sin(smokeOffset * 0.3) * 3 * z, roofY - 22 * z - smokeOffset, 2 * z + smokeOffset * 0.2, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Flagpole with fluttering city banner
+    const flagX = sx + hw * 0.55;
+    const flagY = sy + 2 * z;
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = Math.max(1, 1.5 * z);
+    ctx.beginPath();
+    ctx.moveTo(flagX, flagY);
+    ctx.lineTo(flagX, flagY - 28 * z);
+    ctx.stroke();
+
+    // Golden finial on top of flagpole
+    ctx.fillStyle = '#facc15';
+    ctx.beginPath();
+    ctx.arc(flagX, flagY - 28 * z, 1.8 * z, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Fluttering gold and blue civic flag
+    const wave = Math.sin(this.animFrame * 0.15) * 1.5 * z;
+    ctx.fillStyle = '#0284c7';
+    ctx.beginPath();
+    ctx.moveTo(flagX, flagY - 28 * z);
+    ctx.lineTo(flagX + 8 * z, flagY - 26 * z + wave);
+    ctx.lineTo(flagX + 8 * z, flagY - 20 * z + wave);
+    ctx.lineTo(flagX, flagY - 22 * z);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#facc15';
+    ctx.fillRect(flagX + 2.5 * z, flagY - 25 * z + wave * 0.5, 3 * z, 3 * z);
+  }
+
+  private drawCityHall(sx: number, sy: number, hw: number, hh: number) {
+    const z = this.camera.zoom;
+    const ctx = this.ctx;
+
+    // 1. Classical Neoclassical Monumental Granite Steps & Plaza
+    ctx.fillStyle = '#cbd5e1';
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - hh * 0.95);
+    ctx.lineTo(sx + hw * 0.95, sy);
+    ctx.lineTo(sx, sy + hh * 0.95);
+    ctx.lineTo(sx - hw * 0.95, sy);
+    ctx.closePath();
+    ctx.fill();
+
+    // Stepped terraced entrance
+    for (let s = 1; s <= 3; s++) {
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = Math.max(1, 1 * z);
+      ctx.beginPath();
+      ctx.moveTo(sx - (16 + s * 2) * z, sy + (2 + s * 2) * z);
+      ctx.lineTo(sx, sy + (10 + s * 2) * z);
+      ctx.lineTo(sx + (16 + s * 2) * z, sy + (2 + s * 2) * z);
+      ctx.stroke();
+    }
+
+    // 2. Main Beaux-Arts Palace (Pale Indiana Limestone)
+    const hallH = 38 * z;
+    this.drawIsometricBox(sx, sy - 6 * z, hw * 0.8, hh * 0.65, hallH, '#f8fafc', '#e2e8f0', '#cbd5e1');
+
+    // Monumental Portico Pediment with 6 Fluted Columns
+    const porticoW = 28 * z;
+    const colH = 22 * z;
+    const colY = sy - 6 * z;
+
+    // Pediment triangle roof
+    ctx.fillStyle = '#f1f5f9';
+    ctx.beginPath();
+    ctx.moveTo(sx - porticoW / 2, colY - colH);
+    ctx.lineTo(sx, colY - colH - 10 * z);
+    ctx.lineTo(sx + porticoW / 2, colY - colH);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = Math.max(1, 1.2 * z);
+    ctx.stroke();
+
+    // Civic relief seal in pediment
+    ctx.fillStyle = '#facc15';
+    ctx.beginPath();
+    ctx.arc(sx, colY - colH - 4 * z, 2.5 * z, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 6 Columns
+    for (let c = 0; c < 6; c++) {
+      const colX = sx - porticoW / 2 + 2.5 * z + c * (porticoW - 5 * z) / 5;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(colX - 1.2 * z, colY - colH, 2.4 * z, colH);
+      ctx.fillStyle = '#cbd5e1';
+      ctx.fillRect(colX + 0.6 * z, colY - colH, 0.6 * z, colH);
+    }
+
+    // Grand arched double oak doors
+    ctx.fillStyle = '#451a03';
+    ctx.beginPath();
+    ctx.arc(sx, colY - 10 * z, 4 * z, Math.PI, 0);
+    ctx.lineTo(sx + 4 * z, colY);
+    ctx.lineTo(sx - 4 * z, colY);
+    ctx.closePath();
+    ctx.fill();
+
+    // 3. Central Verdigris Copper Dome & Clock Tower
+    const domeBaseY = colY - hallH - 4 * z;
+
+    // Octagonal limestone drum tower
+    ctx.fillStyle = '#e2e8f0';
+    ctx.fillRect(sx - 10 * z, domeBaseY - 14 * z, 20 * z, 14 * z);
+    ctx.fillStyle = '#cbd5e1';
+    ctx.fillRect(sx + 2 * z, domeBaseY - 14 * z, 8 * z, 14 * z);
+
+    // Working Municipal Clock Face
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(sx, domeBaseY - 7 * z, 4.5 * z, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = Math.max(1, 1 * z);
+    ctx.stroke();
+
+    // Clock hands based on simulation engine gameHour / gameMinute
+    const hourAngle = ((this.engine.gameHour % 12) + this.engine.gameMinute / 60) * (Math.PI / 6) - Math.PI / 2;
+    const minAngle = (this.engine.gameMinute / 60) * Math.PI * 2 - Math.PI / 2;
+    ctx.beginPath();
+    ctx.moveTo(sx, domeBaseY - 7 * z);
+    ctx.lineTo(sx + Math.cos(hourAngle) * 2.5 * z, (domeBaseY - 7 * z) + Math.sin(hourAngle) * 2.5 * z);
+    ctx.moveTo(sx, domeBaseY - 7 * z);
+    ctx.lineTo(sx + Math.cos(minAngle) * 3.8 * z, (domeBaseY - 7 * z) + Math.sin(minAngle) * 3.8 * z);
+    ctx.stroke();
+
+    // Verdigris Copper Dome (Teal green)
+    ctx.fillStyle = '#14b8a6';
+    ctx.beginPath();
+    ctx.arc(sx, domeBaseY - 14 * z, 10 * z, Math.PI, 0);
+    ctx.fill();
+    ctx.fillStyle = '#0d9488';
+    ctx.beginPath();
+    ctx.arc(sx, domeBaseY - 14 * z, 10 * z, Math.PI * 1.5, 0);
+    ctx.lineTo(sx, domeBaseY - 14 * z);
+    ctx.fill();
+
+    // Golden Cupola Spire
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillRect(sx - 1.5 * z, domeBaseY - 26 * z, 3 * z, 4 * z);
+    ctx.beginPath();
+    ctx.moveTo(sx, domeBaseY - 32 * z);
+    ctx.lineTo(sx - 2 * z, domeBaseY - 26 * z);
+    ctx.lineTo(sx + 2 * z, domeBaseY - 26 * z);
+    ctx.closePath();
+    ctx.fill();
+
+    // 4. Civic Plaza Details: Bronze statues & cypress trees
+    [-18 * z, 18 * z].forEach(bx => {
+      // Statue plinth
+      ctx.fillStyle = '#475569';
+      ctx.fillRect(sx + bx - 2.5 * z, sy - 2 * z, 5 * z, 4 * z);
+      // Bronze figure
+      ctx.fillStyle = '#78350f';
+      ctx.fillRect(sx + bx - 1.5 * z, sy - 9 * z, 3 * z, 7 * z);
+      ctx.beginPath();
+      ctx.arc(sx + bx, sy - 10.5 * z, 1.5 * z, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  private drawGrandCentral(sx: number, sy: number, hw: number, hh: number) {
+    const z = this.camera.zoom;
+    const ctx = this.ctx;
+
+    // 1. Beaux-Arts Limestone Concourse Structure
+    const concourseH = 46 * z;
+    this.drawIsometricBox(sx, sy - 4 * z, hw * 0.88, hh * 0.75, concourseH, '#f5ebe0', '#e3d5ca', '#d5bdaf');
+
+    // 2. Triple Grand Arched Windows
+    const archH = 26 * z;
+    const archW = 12 * z;
+    const baseY = sy - 4 * z - 8 * z;
+
+    [-16 * z, 0, 16 * z].forEach(ax => {
+      // Arch frame
+      ctx.fillStyle = '#4a5568';
+      ctx.beginPath();
+      ctx.arc(sx + ax, baseY - archH + archW / 2, archW / 2, Math.PI, 0);
+      ctx.lineTo(sx + ax + archW / 2, baseY);
+      ctx.lineTo(sx + ax - archW / 2, baseY);
+      ctx.closePath();
+      ctx.fill();
+
+      // Golden interior chandelier glow
+      ctx.fillStyle = 'rgba(254, 240, 138, 0.85)';
+      ctx.beginPath();
+      ctx.arc(sx + ax, baseY - archH + archW / 2 + 1 * z, (archW / 2) - 1.5 * z, Math.PI, 0);
+      ctx.lineTo(sx + ax + archW / 2 - 1.5 * z, baseY);
+      ctx.lineTo(sx + ax - archW / 2 + 1.5 * z, baseY);
+      ctx.closePath();
+      ctx.fill();
+
+      // Bronze window mullions grid
+      ctx.strokeStyle = '#2d3748';
+      ctx.lineWidth = Math.max(1, 1 * z);
+      ctx.beginPath();
+      ctx.moveTo(sx + ax, baseY - archH + archW / 2);
+      ctx.lineTo(sx + ax, baseY);
+      ctx.moveTo(sx + ax - archW / 2 + 2 * z, baseY - archH * 0.5);
+      ctx.lineTo(sx + ax + archW / 2 - 2 * z, baseY - archH * 0.5);
+      ctx.stroke();
+    });
+
+    // 3. Iconic Central Sculptural Group & Tiffany Glass Clock
+    const topY = sy - 4 * z - concourseH;
+
+    // Grand Central ornamental pediment
+    ctx.fillStyle = '#e3d5ca';
+    ctx.fillRect(sx - 18 * z, topY, 36 * z, 8 * z);
+    ctx.strokeStyle = '#b08968';
+    ctx.lineWidth = Math.max(1, 1.2 * z);
+    ctx.strokeRect(sx - 18 * z, topY, 36 * z, 8 * z);
+
+    // Monumental Tiffany Glass Clock
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(sx, topY + 4 * z, 5 * z, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = Math.max(1, 1.5 * z);
+    ctx.stroke();
+
+    // Clock hands
+    ctx.strokeStyle = '#1e293b';
+    ctx.beginPath();
+    ctx.moveTo(sx, topY + 4 * z);
+    ctx.lineTo(sx + 2 * z, topY + 2 * z);
+    ctx.moveTo(sx, topY + 4 * z);
+    ctx.lineTo(sx - 1 * z, topY + 1 * z);
+    ctx.stroke();
+
+    // Golden Statues of Mercury & Minerva flanking the clock
+    ctx.fillStyle = '#f59e0b';
+    // Mercury (left)
+    ctx.fillRect(sx - 10 * z, topY - 6 * z, 4 * z, 8 * z);
+    ctx.beginPath();
+    ctx.arc(sx - 8 * z, topY - 8 * z, 2 * z, 0, Math.PI * 2);
+    ctx.fill();
+    // Hercules/Minerva (right)
+    ctx.fillRect(sx + 6 * z, topY - 6 * z, 4 * z, 8 * z);
+    ctx.beginPath();
+    ctx.arc(sx + 8 * z, topY - 8 * z, 2 * z, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Arched copper roof barrel vault
+    ctx.fillStyle = '#0f766e';
+    ctx.beginPath();
+    ctx.moveTo(sx - hw * 0.8, topY);
+    ctx.lineTo(sx - hw * 0.5, topY - 10 * z);
+    ctx.lineTo(sx + hw * 0.5, topY - 10 * z);
+    ctx.lineTo(sx + hw * 0.8, topY);
+    ctx.closePath();
+    ctx.fill();
+
+    // Terminal Banner "GRAND CENTRAL"
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(sx - 20 * z, sy - 8 * z, 40 * z, 5 * z);
+    ctx.fillStyle = '#fef08a';
+    ctx.font = `bold ${Math.max(5, Math.floor(5 * z))}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('GRAND CENTRAL', sx, sy - 5.5 * z);
+
+    // Front Passenger Entry Awning
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(sx - 14 * z, sy - 2 * z, 28 * z, 2.5 * z);
+    ctx.fillStyle = '#facc15';
+    for (let b = -12; b <= 12; b += 6) {
+      ctx.fillRect(sx + b * z, sy - 0.5 * z, 1.5 * z, 2 * z);
     }
   }
 

@@ -2,6 +2,7 @@ import { SimulationEngine } from '../simulation/SimulationEngine.ts';
 import { sounds } from '../core/SoundEffects.ts';
 import { OverlayMode, WeatherType } from '../core/Constants.ts';
 import { BudgetModal } from './BudgetModal.ts';
+import { MilestoneModal } from './MilestoneModal.ts';
 import { NewsTicker } from './NewsTicker.ts';
 import { SnapshotTool } from './SnapshotTool.ts';
 
@@ -11,6 +12,7 @@ export class HUD {
 
   // Sub-components
   public budgetModal: BudgetModal;
+  public milestoneModal: MilestoneModal;
   public newsTicker: NewsTicker;
   public snapshotTool?: SnapshotTool;
 
@@ -63,6 +65,7 @@ export class HUD {
 
     // Initialize sub-components
     this.budgetModal = new BudgetModal(this.engine);
+    this.milestoneModal = new MilestoneModal(this.engine);
     const tickerEl = document.getElementById('news-ticker')!;
     const tickerTextEl = document.getElementById('ticker-text')!;
     this.newsTicker = new NewsTicker(this.engine, tickerEl, tickerTextEl);
@@ -80,6 +83,9 @@ export class HUD {
       if (this.budgetModal.isOpen()) {
         this.budgetModal.updateDisplay();
       }
+      if (this.milestoneModal.isOpen()) {
+        this.milestoneModal.renderMilestonesList();
+      }
     };
     this.engine.onNotification = (msg: string) => {
       this.showToast(msg);
@@ -88,6 +94,15 @@ export class HUD {
   }
 
   private setupEventListeners() {
+    // Milestone badge click in top bar
+    const milestoneBadge = document.getElementById('stat-milestone');
+    if (milestoneBadge) {
+      milestoneBadge.addEventListener('click', () => {
+        sounds.playClick();
+        this.milestoneModal.toggle();
+      });
+    }
+
     // Toolbar buttons
     this.toolButtons.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -237,6 +252,23 @@ export class HUD {
   }
 
   public selectTool(toolName: string) {
+    // Check if selecting a locked civic reward
+    if (toolName === 'mayors-mansion' && !this.engine.unlockedMilestones.includes('town')) {
+      sounds.playError();
+      this.showToast("🔒 Mayor's Mansion requires Booming Town (500 Pop) to unlock!");
+      return;
+    }
+    if (toolName === 'city-hall' && !this.engine.unlockedMilestones.includes('city')) {
+      sounds.playError();
+      this.showToast("🔒 City Hall requires Prosperous City (1,500 Pop) to unlock!");
+      return;
+    }
+    if (toolName === 'grand-central' && !this.engine.unlockedMilestones.includes('metropolis')) {
+      sounds.playError();
+      this.showToast("🔒 Grand Central requires Grand Metropolis (5,000 Pop) to unlock!");
+      return;
+    }
+
     this.toolButtons.forEach(btn => {
       if (btn.dataset.tool === toolName) {
         btn.classList.add('active');
@@ -271,6 +303,10 @@ export class HUD {
 
     this.popEl.textContent = this.engine.population.toLocaleString();
     this.dateEl.textContent = this.engine.getDateString();
+
+    // Update Milestones badge and toolbar lock states
+    this.milestoneModal.updateTopBarBadge();
+    this.milestoneModal.updateToolbarRewards();
 
     if (this.weatherIconEl && this.weatherValEl) {
       switch (this.engine.weather) {
