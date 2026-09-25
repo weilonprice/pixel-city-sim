@@ -127,3 +127,20 @@ A prioritized development roadmap and feature checklist for expanding **Pixel Ci
 - [x] **City Snapshot / Camera Tool**
   - [x] One-click high-resolution screenshot export without UI clutter (`📸 Photo` button & `P` shortcut).
   - [x] Vintage camera flash overlay animation with shutter sound effect.
+
+---
+
+## 🌪️ Priority 7: Natural Disasters & Emergency Response System
+
+- [x] **Category F4 Tornado**
+  - [x] Procedural cyclonic funnel with rotating vortex, pathing across terrain, uprooting structures into rubble, and sparking electrical fires.
+- [x] **Magnitude 7.2 Earthquake**
+  - [x] Real-time seismic camera screen shake, radiating fault fissures, fractured roadways, collapsed structures, and secondary fires.
+- [x] **Cosmic Meteor Strike**
+  - [x] High-energy asteroid descending with smoke trail, blast explosion shockwave, and scorched impact crater.
+- [x] **Emergency Operations Center Modal**
+  - [x] Retro command center dialog (`🚨 Disasters` button / `D` shortcut) with disaster triggers, active status indicator, and emergency abort controls.
+- [x] **Municipal Cleanup Crews & Persistent Rubble**
+  - [x] Ruins and damaged roadways persistent across save/load, clearable by manual bulldozer ($5) or one-click municipal emergency cleanup crews ($10/site).
+- [x] **Emergency Soundscapes & Bulletins**
+  - [x] Air-raid warning sirens, earthquake rumbles, tornado roars, blast audio, and live breaking bulletins on News Ticker.
