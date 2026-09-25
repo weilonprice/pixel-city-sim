@@ -14,6 +14,10 @@ A prioritized development roadmap and feature checklist for expanding **Pixel Ci
 - [x] **PixelLab Municipal & Emergency Sprites (Batch 2)**
   - [x] Generated & integrated `fire_station.png`, `police_station.png`, `hospital.png`, `school.png`.
   - [x] Generated & integrated `fire_truck.png` and `police_car.png` with dynamic emergency sirens.
+- [x] **PixelLab Transit, Landmarks & High-Density Sprites (Batch 3)**
+  - [x] Generated & integrated `bus_depot.png`, `bus_stop.png`, `city_bus.png`, `train_station.png`, `train_locomotive.png`.
+  - [x] Generated & integrated `mayors_mansion.png`, `city_hall.png`, `grand_central.png`.
+  - [x] Generated & integrated `horizon_residence.png`, `apex_pinnacle.png`, `corporate_plaza.png`, `world_trade_tower.png`, `biotech_campus.png`, `aerospace_factory.png`.
 - [x] **Drag-to-Build & Rectangle Zoning UX**
   - [x] Drag-to-zone bounding box for residential, commercial, industrial, and mass demolish.
   - [x] Straight-line dominant-axis road dragging.
