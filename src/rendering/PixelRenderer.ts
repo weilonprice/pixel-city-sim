@@ -1,4 +1,4 @@
-import { TILE_WIDTH, TILE_HEIGHT, TileType, ZoneType, Tile, OverlayMode, WeatherType, isAnyRoad } from '../core/Constants.ts';
+import { TILE_WIDTH, TILE_HEIGHT, TileType, ZoneType, Tile, OverlayMode, WeatherType, isAnyRoad, isTrackOrStation } from '../core/Constants.ts';
 import { Camera } from '../core/Camera.ts';
 import { Grid } from '../simulation/Grid.ts';
 import { SimulationEngine } from '../simulation/SimulationEngine.ts';
@@ -35,6 +35,7 @@ interface Vehicle {
   isTruck?: boolean;
   isEmergency?: 'fire' | 'police';
   isBus?: boolean;
+  isTrain?: boolean;
   passengers?: number;
   dwellTimer?: number;
 }
@@ -179,6 +180,10 @@ export class PixelRenderer {
       this.drawCityHall(sx, sy, halfW, halfH);
     } else if (tile.type === TileType.GRAND_CENTRAL) {
       this.drawGrandCentral(sx, sy, halfW, halfH);
+    } else if (tile.type === TileType.TRAIN_STATION) {
+      this.drawTrainStation(sx, sy, halfW, halfH);
+    } else if (tile.type === TileType.TRAIN_TRACK) {
+      this.drawTrainTrack(sx, sy, halfW, halfH, tile);
     } else if (tile.building) {
       this.drawBuilding(sx, sy, halfW, halfH, tile);
     }
@@ -1021,6 +1026,340 @@ export class PixelRenderer {
       this.ctx.arc(sx - 1 * z, sy - 9 * z, 2 * z, 0, Math.PI * 2);
       this.ctx.fill();
       this.ctx.fillRect(sx - 2.5 * z, sy - 7 * z, 3 * z, 5 * z);
+    }
+  }
+
+  private drawTrainStation(sx: number, sy: number, hw: number, hh: number) {
+    const z = this.camera.zoom;
+    const ctx = this.ctx;
+
+    if (assetManager.hasSprite('train_station')) {
+      const img = assetManager.getSprite('train_station')!;
+      const w = img.naturalWidth * z;
+      const h = img.naturalHeight * z;
+      ctx.drawImage(img, sx - w / 2, sy + hh - h, w, h);
+      return;
+    }
+
+    // 1. Concrete & Granite Platform Foundation Slab
+    ctx.fillStyle = '#64748b';
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - hh);
+    ctx.lineTo(sx + hw, sy);
+    ctx.lineTo(sx + hw, sy + 3 * z);
+    ctx.lineTo(sx, sy + hh + 3 * z);
+    ctx.lineTo(sx - hw, sy + 3 * z);
+    ctx.lineTo(sx - hw, sy);
+    ctx.closePath();
+    ctx.fill();
+
+    // Upper platform surface
+    ctx.fillStyle = '#94a3b8';
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - hh);
+    ctx.lineTo(sx + hw, sy);
+    ctx.lineTo(sx, sy + hh);
+    ctx.lineTo(sx - hw, sy);
+    ctx.closePath();
+    ctx.fill();
+
+    // Tactile yellow safety edge along platform
+    ctx.strokeStyle = '#facc15';
+    ctx.lineWidth = Math.max(1, 1.5 * z);
+    ctx.beginPath();
+    ctx.moveTo(sx - hw * 0.85, sy + hh * 0.15);
+    ctx.lineTo(sx - hw * 0.15, sy + hh * 0.85);
+    ctx.stroke();
+
+    // 2. Main Victorian Red-Brick Station Terminal
+    const buildingW = hw * 0.7;
+    const buildingH = hh * 0.65;
+    const height = 36 * z;
+    this.drawIsometricBox(sx + 4 * z, sy - 6 * z, buildingW, buildingH, height, '#7f1d1d', '#991b1b', '#450a0a');
+
+    // Pitched Slate/Copper Roof
+    ctx.fillStyle = '#0f766e'; // Verdigris Copper
+    ctx.beginPath();
+    ctx.moveTo(sx + 4 * z - buildingW * 0.6, sy - 6 * z - height);
+    ctx.lineTo(sx + 4 * z, sy - 6 * z - height - 12 * z);
+    ctx.lineTo(sx + 4 * z + buildingW * 0.6, sy - 6 * z - height);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#115e59';
+    ctx.lineWidth = 1 * z;
+    ctx.stroke();
+
+    // Station Clock Tower Spire (Central turret)
+    const towerW = 8 * z;
+    const towerH = 18 * z;
+    const towerBaseY = sy - 6 * z - height;
+    ctx.fillStyle = '#7f1d1d';
+    ctx.fillRect(sx + 4 * z - towerW / 2, towerBaseY - towerH, towerW, towerH);
+    ctx.fillStyle = '#991b1b';
+    ctx.fillRect(sx + 4 * z - towerW / 2 + 1 * z, towerBaseY - towerH, towerW - 2 * z, towerH);
+
+    // Pyramidal Steeple Peak
+    ctx.fillStyle = '#0f766e';
+    ctx.beginPath();
+    ctx.moveTo(sx + 4 * z - towerW / 2 - 1 * z, towerBaseY - towerH);
+    ctx.lineTo(sx + 4 * z, towerBaseY - towerH - 10 * z);
+    ctx.lineTo(sx + 4 * z + towerW / 2 + 1 * z, towerBaseY - towerH);
+    ctx.closePath();
+    ctx.fill();
+
+    // Working Station Clock Face
+    ctx.fillStyle = '#fef08a';
+    ctx.beginPath();
+    ctx.arc(sx + 4 * z, towerBaseY - towerH * 0.65, 3 * z, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#450a0a';
+    ctx.lineWidth = 1 * z;
+    ctx.stroke();
+    // Clock hands
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1 * z;
+    ctx.beginPath();
+    ctx.moveTo(sx + 4 * z, towerBaseY - towerH * 0.65);
+    ctx.lineTo(sx + 4 * z + 1.5 * z, towerBaseY - towerH * 0.65 - 1.5 * z);
+    ctx.stroke();
+
+    // Arched Windows on facade (Amber backlit)
+    ctx.fillStyle = '#fef08a';
+    ctx.fillRect(sx - 4 * z, sy - 14 * z, 5 * z, 7 * z);
+    ctx.fillRect(sx + 6 * z, sy - 14 * z, 5 * z, 7 * z);
+    ctx.fillStyle = '#450a0a';
+    ctx.fillRect(sx - 4 * z + 2 * z, sy - 14 * z, 1 * z, 7 * z);
+    ctx.fillRect(sx + 6 * z + 2 * z, sy - 14 * z, 1 * z, 7 * z);
+
+    // 3. Platform Passenger Canopy (Curved iron brackets & corrugated roof)
+    const canopyW = 24 * z;
+    const canopyH = 14 * z;
+    const canopyX = sx - 12 * z;
+    const canopyY = sy - 4 * z;
+
+    // Cast iron canopy posts
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = Math.max(1, 1.8 * z);
+    ctx.beginPath();
+    ctx.moveTo(canopyX - 4 * z, canopyY);
+    ctx.lineTo(canopyX - 4 * z, canopyY - canopyH);
+    ctx.moveTo(canopyX + canopyW * 0.5, canopyY + 6 * z);
+    ctx.lineTo(canopyX + canopyW * 0.5, canopyY + 6 * z - canopyH);
+    ctx.stroke();
+
+    // Canopy Roof (Dark forest green)
+    ctx.fillStyle = '#14532d';
+    ctx.beginPath();
+    ctx.moveTo(canopyX - 8 * z, canopyY - canopyH);
+    ctx.lineTo(canopyX + canopyW * 0.7, canopyY + 5 * z - canopyH);
+    ctx.lineTo(canopyX + canopyW * 0.7 + 6 * z, canopyY + 5 * z - canopyH - 4 * z);
+    ctx.lineTo(canopyX - 8 * z + 6 * z, canopyY - canopyH - 4 * z);
+    ctx.closePath();
+    ctx.fill();
+
+    // Platform wooden bench
+    ctx.fillStyle = '#92400e';
+    ctx.fillRect(canopyX - 2 * z, canopyY - 4 * z, 8 * z, 2.5 * z);
+
+    // Station sign marquee
+    ctx.fillStyle = '#1e3a8a';
+    ctx.fillRect(sx - 10 * z, sy - height * 0.65, 20 * z, 4 * z);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${Math.max(5, Math.floor(6 * z))}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('STATION', sx, sy - height * 0.65 + 2 * z);
+
+    // Waiting passengers on platform
+    if (this.animFrame % 60 < 50) {
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.arc(canopyX + 2 * z, canopyY - 6 * z, 1.8 * z, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(canopyX + 0.8 * z, canopyY - 4.2 * z, 2.4 * z, 4 * z);
+    }
+  }
+
+  private drawTrainTrack(sx: number, sy: number, hw: number, hh: number, tile: Tile) {
+    const ctx = this.ctx;
+    const z = this.camera.zoom;
+    const mask = tile.roadMask;
+
+    // Check if track is a water bridge
+    if (tile.isBridge) {
+      // Steel trestle pillars in water
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(sx - 5 * z, sy + hh * 0.5, 4 * z, 14 * z);
+      ctx.fillRect(sx + 1 * z, sy + hh * 0.5, 4 * z, 14 * z);
+
+      // Steel truss bridge deck
+      ctx.fillStyle = '#475569';
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - hh * 0.8);
+      ctx.lineTo(sx + hw * 0.8, sy);
+      ctx.lineTo(sx, sy + hh * 0.8);
+      ctx.lineTo(sx - hw * 0.8, sy);
+      ctx.closePath();
+      ctx.fill();
+
+      // Industrial dark orange/rust guardrail
+      ctx.strokeStyle = '#c2410c';
+      ctx.lineWidth = 1.8 * z;
+      ctx.beginPath();
+      ctx.moveTo(sx - hw * 0.65, sy - 6 * z);
+      ctx.lineTo(sx, sy + hh * 0.65 - 6 * z);
+      ctx.moveTo(sx, sy - hh * 0.65 - 6 * z);
+      ctx.lineTo(sx + hw * 0.65, sy - 6 * z);
+      ctx.stroke();
+    } else {
+      // 1. Gravel / Ballast Bed (Crushed granite aggregate)
+      ctx.fillStyle = '#44403c';
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - hh * 0.9);
+      ctx.lineTo(sx + hw * 0.9, sy);
+      ctx.lineTo(sx, sy + hh * 0.9);
+      ctx.lineTo(sx - hw * 0.9, sy);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#57534e';
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - hh * 0.7);
+      ctx.lineTo(sx + hw * 0.7, sy);
+      ctx.lineTo(sx, sy + hh * 0.7);
+      ctx.lineTo(sx - hw * 0.7, sy);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // 2. Wooden Sleepers / Cross-Ties (Creosote-treated timber)
+    ctx.strokeStyle = '#29180a';
+    ctx.lineWidth = Math.max(1.5, 2.2 * z);
+
+    // 3. Steel Rails (Dual parallel tracks)
+    const drawRails = (railPath: () => void) => {
+      // Rail base shadow
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = Math.max(1.5, 2.0 * z);
+      railPath();
+
+      // Polished steel railhead highlight
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = Math.max(1, 1.2 * z);
+      railPath();
+    };
+
+    // Determine track layout from bitmask:
+    // (mask & 5) is N(1) & S(4) (vertical axis: y - hh to y + hh)
+    // (mask & 10) is E(2) & W(8) (horizontal axis: x - hw to x + hw)
+    if ((mask & 5) === 5 || mask === 0) {
+      // Vertical Track (N to S): Sleepers run horizontally
+      const offsets = [-0.65, -0.4, -0.15, 0.1, 0.35, 0.6];
+      ctx.beginPath();
+      offsets.forEach(off => {
+        ctx.moveTo(sx - 7 * z, sy + hh * off);
+        ctx.lineTo(sx + 7 * z, sy + hh * off);
+      });
+      ctx.stroke();
+
+      // Parallel steel rails running along vertical axis
+      drawRails(() => {
+        ctx.beginPath();
+        ctx.moveTo(sx - 3.5 * z, sy - hh);
+        ctx.lineTo(sx - 3.5 * z, sy + hh);
+        ctx.moveTo(sx + 3.5 * z, sy - hh);
+        ctx.lineTo(sx + 3.5 * z, sy + hh);
+        ctx.stroke();
+      });
+    } else if ((mask & 10) === 10) {
+      // Horizontal Track (E to W): Sleepers run vertically
+      const offsets = [-0.65, -0.4, -0.15, 0.1, 0.35, 0.6];
+      ctx.beginPath();
+      offsets.forEach(off => {
+        ctx.moveTo(sx + hw * off, sy - 5 * z);
+        ctx.lineTo(sx + hw * off, sy + 5 * z);
+      });
+      ctx.stroke();
+
+      // Parallel steel rails running along horizontal axis
+      drawRails(() => {
+        ctx.beginPath();
+        ctx.moveTo(sx - hw, sy - 2.5 * z);
+        ctx.lineTo(sx + hw, sy - 2.5 * z);
+        ctx.moveTo(sx - hw, sy + 2.5 * z);
+        ctx.lineTo(sx + hw, sy + 2.5 * z);
+        ctx.stroke();
+      });
+    } else {
+      // Curves & Junctions: Draw connecting stubs to each connected direction
+      // Sleepers around center
+      ctx.beginPath();
+      ctx.moveTo(sx - 5 * z, sy - 5 * z);
+      ctx.lineTo(sx + 5 * z, sy + 5 * z);
+      ctx.moveTo(sx - 5 * z, sy + 5 * z);
+      ctx.lineTo(sx + 5 * z, sy - 5 * z);
+      ctx.stroke();
+
+      // North stub
+      if (mask & 1) {
+        ctx.beginPath();
+        ctx.moveTo(sx - 5 * z, sy - hh * 0.4);
+        ctx.lineTo(sx + 5 * z, sy - hh * 0.4);
+        ctx.stroke();
+        drawRails(() => {
+          ctx.beginPath();
+          ctx.moveTo(sx - 3 * z, sy);
+          ctx.lineTo(sx - 3 * z, sy - hh);
+          ctx.moveTo(sx + 3 * z, sy);
+          ctx.lineTo(sx + 3 * z, sy - hh);
+          ctx.stroke();
+        });
+      }
+      // East stub
+      if (mask & 2) {
+        ctx.beginPath();
+        ctx.moveTo(sx + hw * 0.4, sy - 4 * z);
+        ctx.lineTo(sx + hw * 0.4, sy + 4 * z);
+        ctx.stroke();
+        drawRails(() => {
+          ctx.beginPath();
+          ctx.moveTo(sx, sy - 2.5 * z);
+          ctx.lineTo(sx + hw, sy - 2.5 * z);
+          ctx.moveTo(sx, sy + 2.5 * z);
+          ctx.lineTo(sx + hw, sy + 2.5 * z);
+          ctx.stroke();
+        });
+      }
+      // South stub
+      if (mask & 4) {
+        ctx.beginPath();
+        ctx.moveTo(sx - 5 * z, sy + hh * 0.4);
+        ctx.lineTo(sx + 5 * z, sy + hh * 0.4);
+        ctx.stroke();
+        drawRails(() => {
+          ctx.beginPath();
+          ctx.moveTo(sx - 3 * z, sy);
+          ctx.lineTo(sx - 3 * z, sy + hh);
+          ctx.moveTo(sx + 3 * z, sy);
+          ctx.lineTo(sx + 3 * z, sy + hh);
+          ctx.stroke();
+        });
+      }
+      // West stub
+      if (mask & 8) {
+        ctx.beginPath();
+        ctx.moveTo(sx - hw * 0.4, sy - 4 * z);
+        ctx.lineTo(sx - hw * 0.4, sy + 4 * z);
+        ctx.stroke();
+        drawRails(() => {
+          ctx.beginPath();
+          ctx.moveTo(sx, sy - 2.5 * z);
+          ctx.lineTo(sx - hw, sy - 2.5 * z);
+          ctx.moveTo(sx, sy + 2.5 * z);
+          ctx.lineTo(sx - hw, sy + 2.5 * z);
+          ctx.stroke();
+        });
+      }
     }
   }
 
@@ -2114,6 +2453,43 @@ export class PixelRenderer {
       }
     }
 
+    // 4. Heavy Rail Passenger Trains
+    if (this.engine.trainStationCount > 0) {
+      const trainCount = this.vehicles.filter(v => v.isTrain).length;
+      const maxTrains = Math.min(4, Math.max(1, this.engine.trainStationCount * 2));
+      if (trainCount < maxTrains && Math.random() < 0.08) {
+        const trainTrackTiles: Tile[] = [];
+        for (let x = 0; x < this.grid.size; x++) {
+          for (let y = 0; y < this.grid.size; y++) {
+            const t = this.grid.getTile(x, y);
+            if (t && (t.type === TileType.TRAIN_TRACK || t.type === TileType.TRAIN_STATION)) {
+              trainTrackTiles.push(t);
+            }
+          }
+        }
+
+        if (trainTrackTiles.length > 0) {
+          const start = trainTrackTiles[Math.floor(Math.random() * trainTrackTiles.length)];
+          const neighbors = this.grid.getNeighbors(start.x, start.y).filter(n => isTrackOrStation(n.tile.type));
+          if (neighbors.length > 0) {
+            const target = neighbors[Math.floor(Math.random() * neighbors.length)].tile;
+            this.vehicles.push({
+              id: Math.random().toString(),
+              x: start.x,
+              y: start.y,
+              targetX: target.x,
+              targetY: target.y,
+              color: '#1e293b',
+              speed: 0.03,
+              isTrain: true,
+              passengers: Math.floor(Math.random() * 80) + 20,
+              dwellTimer: 0
+            });
+          }
+        }
+      }
+    }
+
     // Update & draw vehicles
     const z = this.camera.zoom;
     for (let i = this.vehicles.length - 1; i >= 0; i--) {
@@ -2135,6 +2511,27 @@ export class PixelRenderer {
             if (nextX >= 0 && nextX < this.grid.size) {
               v.targetX = nextX;
               v.targetY = highwayY;
+            } else {
+              this.vehicles.splice(i, 1);
+              continue;
+            }
+          } else if (v.isTrain) {
+            const neighbors = this.grid.getNeighbors(v.targetX, v.targetY).filter(n => isTrackOrStation(n.tile.type));
+            if (neighbors.length > 0) {
+              const next = neighbors[Math.floor(Math.random() * neighbors.length)].tile;
+              v.targetX = next.x;
+              v.targetY = next.y;
+
+              // Check if train should dwell at train station
+              if (next.type === TileType.TRAIN_STATION || next.type === TileType.GRAND_CENTRAL) {
+                if (Math.random() < 0.6) {
+                  v.dwellTimer = 45; // ~0.75s station dwell
+                  if (Math.random() < 0.4) {
+                    sounds.playTrainHorn();
+                  }
+                }
+              }
+              v.speed = 0.03;
             } else {
               this.vehicles.splice(i, 1);
               continue;
@@ -2253,6 +2650,83 @@ export class PixelRenderer {
           this.ctx.font = `bold ${Math.max(9, Math.floor(9 * z))}px sans-serif`;
           this.ctx.textAlign = 'center';
           this.ctx.fillText('🚏', sx, sy - 14 * z + bounce);
+        }
+        continue;
+      }
+
+      // Heavy Rail Passenger Locomotive & Coach
+      if (v.isTrain) {
+        const trainW = 32 * z;
+        const trainH = 12 * z;
+        const trainY = sy - 6 * z;
+
+        // Train shadow on tracks
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+        this.ctx.fillRect(sx - trainW / 2 + 2 * z, trainY + trainH - 2 * z, trainW - 2 * z, 4 * z);
+
+        // Locomotive Body (Dark Charcoal / Navy Steel)
+        this.ctx.fillStyle = '#1e293b';
+        this.ctx.fillRect(sx - trainW / 2, trainY + 2 * z, trainW * 0.55, trainH - 2 * z);
+
+        // Locomotive Cab Roof (Crimson accent stripe)
+        this.ctx.fillStyle = '#dc2626';
+        this.ctx.fillRect(sx - trainW / 2, trainY, trainW * 0.55, 3 * z);
+
+        // Cab Windows (Glowing warm yellow)
+        this.ctx.fillStyle = '#fef08a';
+        this.ctx.fillRect(sx - trainW / 2 + 2 * z, trainY + 3.5 * z, 4 * z, 3 * z);
+        this.ctx.fillRect(sx - trainW / 2 + 8 * z, trainY + 3.5 * z, 3 * z, 3 * z);
+
+        // Cowcatcher / Front Pilot Grille
+        this.ctx.fillStyle = '#475569';
+        this.ctx.beginPath();
+        this.ctx.moveTo(sx - trainW / 2 - 3 * z, trainY + trainH);
+        this.ctx.lineTo(sx - trainW / 2, trainY + trainH - 4 * z);
+        this.ctx.lineTo(sx - trainW / 2, trainY + trainH);
+        this.ctx.closePath();
+        this.ctx.fill();
+
+        // Locomotive Smokestack / Exhaust with steam puff
+        this.ctx.fillStyle = '#0f172a';
+        this.ctx.fillRect(sx - trainW / 2 + 13 * z, trainY - 3 * z, 3 * z, 4 * z);
+        // Animated steam puff
+        const steamPhase = (this.animFrame * 0.15) % 1;
+        this.ctx.fillStyle = `rgba(241, 245, 249, ${0.7 - steamPhase * 0.6})`;
+        this.ctx.beginPath();
+        this.ctx.arc(sx - trainW / 2 + 14 * z, trainY - 5 * z - steamPhase * 6 * z, 2.5 * z + steamPhase * 2 * z, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        // Bright Locomotive Headlight beam
+        this.ctx.fillStyle = '#fef08a';
+        this.ctx.fillRect(sx - trainW / 2 - 2 * z, trainY + 5 * z, 2 * z, 2.5 * z);
+
+        // Passenger Coach behind locomotive
+        const coachX = sx - trainW / 2 + trainW * 0.62;
+        const coachW = trainW * 0.45;
+        this.ctx.fillStyle = '#334155';
+        this.ctx.fillRect(coachX, trainY + 1 * z, coachW, trainH - 1 * z);
+        this.ctx.fillStyle = '#f59e0b'; // Gold belt stripe
+        this.ctx.fillRect(coachX, trainY + 5 * z, coachW, 1.5 * z);
+
+        // Coach Windows
+        this.ctx.fillStyle = '#bae6fd';
+        this.ctx.fillRect(coachX + 2 * z, trainY + 2 * z, 3 * z, 2.5 * z);
+        this.ctx.fillRect(coachX + 7 * z, trainY + 2 * z, 3 * z, 2.5 * z);
+
+        // Steel Wheels
+        this.ctx.fillStyle = '#0f172a';
+        this.ctx.fillRect(sx - trainW / 2 + 2 * z, trainY + trainH - 1 * z, 3.5 * z, 2.5 * z);
+        this.ctx.fillRect(sx - trainW / 2 + 10 * z, trainY + trainH - 1 * z, 3.5 * z, 2.5 * z);
+        this.ctx.fillRect(coachX + 2 * z, trainY + trainH - 1 * z, 3.5 * z, 2.5 * z);
+        this.ctx.fillRect(coachX + 8 * z, trainY + trainH - 1 * z, 3.5 * z, 2.5 * z);
+
+        // Passenger boarding indicator when dwelling at station
+        if (v.dwellTimer && v.dwellTimer > 0) {
+          const bounce = Math.sin(this.animFrame * 0.2) * 2;
+          this.ctx.fillStyle = '#ea580c';
+          this.ctx.font = `bold ${Math.max(10, Math.floor(10 * z))}px sans-serif`;
+          this.ctx.textAlign = 'center';
+          this.ctx.fillText('🚂', sx, sy - 18 * z + bounce);
         }
         continue;
       }

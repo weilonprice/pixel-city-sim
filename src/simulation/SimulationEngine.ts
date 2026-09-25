@@ -34,6 +34,8 @@ export class SimulationEngine {
   public busRidership: number = 0;
   public busStopCount: number = 0;
   public busDepotCount: number = 0;
+  public trainStationCount: number = 0;
+  public trainRidership: number = 0;
 
   // City Milestones & Reward Buildings
   public unlockedMilestones: string[] = ['settlement'];
@@ -212,7 +214,7 @@ export class SimulationEngine {
 
       for (const n of neighbors) {
         const t = n.tile;
-        if (!t.powered && (isAnyRoad(t.type) || t.type === TileType.PARK || t.type === TileType.POWER_PLANT || t.type === TileType.WATER_PUMP || t.type === TileType.FIRE_STATION || t.type === TileType.POLICE_STATION || t.type === TileType.HOSPITAL || t.type === TileType.SCHOOL || t.type === TileType.BUS_DEPOT || t.type === TileType.BUS_STOP || t.type === TileType.MAYORS_MANSION || t.type === TileType.CITY_HALL || t.type === TileType.GRAND_CENTRAL || t.building)) {
+        if (!t.powered && (isAnyRoad(t.type) || t.type === TileType.PARK || t.type === TileType.POWER_PLANT || t.type === TileType.WATER_PUMP || t.type === TileType.FIRE_STATION || t.type === TileType.POLICE_STATION || t.type === TileType.HOSPITAL || t.type === TileType.SCHOOL || t.type === TileType.BUS_DEPOT || t.type === TileType.BUS_STOP || t.type === TileType.TRAIN_STATION || t.type === TileType.TRAIN_TRACK || t.type === TileType.MAYORS_MANSION || t.type === TileType.CITY_HALL || t.type === TileType.GRAND_CENTRAL || t.building)) {
           t.powered = true;
           if (t.building) t.building.powered = true;
           powerQueue.push(t);
@@ -226,7 +228,7 @@ export class SimulationEngine {
 
       for (const n of neighbors) {
         const t = n.tile;
-        if (!t.watered && (isAnyRoad(t.type) || t.type === TileType.PARK || t.type === TileType.WATER_PUMP || t.type === TileType.FIRE_STATION || t.type === TileType.POLICE_STATION || t.type === TileType.HOSPITAL || t.type === TileType.SCHOOL || t.type === TileType.BUS_DEPOT || t.type === TileType.BUS_STOP || t.type === TileType.MAYORS_MANSION || t.type === TileType.CITY_HALL || t.type === TileType.GRAND_CENTRAL || t.building)) {
+        if (!t.watered && (isAnyRoad(t.type) || t.type === TileType.PARK || t.type === TileType.WATER_PUMP || t.type === TileType.FIRE_STATION || t.type === TileType.POLICE_STATION || t.type === TileType.HOSPITAL || t.type === TileType.SCHOOL || t.type === TileType.BUS_DEPOT || t.type === TileType.BUS_STOP || t.type === TileType.TRAIN_STATION || t.type === TileType.TRAIN_TRACK || t.type === TileType.MAYORS_MANSION || t.type === TileType.CITY_HALL || t.type === TileType.GRAND_CENTRAL || t.building)) {
           t.watered = true;
           if (t.building) t.building.watered = true;
           waterQueue.push(t);
@@ -241,6 +243,8 @@ export class SimulationEngine {
     const size = this.grid.size;
     let busDepots = 0;
     let busStops = 0;
+    let trainStations = 0;
+    let trainTracks = 0;
     let coveredPop = 0;
     let coveredJobs = 0;
 
@@ -251,6 +255,10 @@ export class SimulationEngine {
           busDepots++;
         } else if (t.type === TileType.BUS_STOP && this.grid.isAdjacentToRoad(x, y)) {
           busStops++;
+        } else if (t.type === TileType.TRAIN_STATION && t.powered && t.watered) {
+          trainStations++;
+        } else if (t.type === TileType.TRAIN_TRACK) {
+          trainTracks++;
         }
         if (t.building && !t.building.onFire && !t.building.isConstructing && t.transitCoverage > 20) {
           coveredPop += t.building.residents;
@@ -261,6 +269,7 @@ export class SimulationEngine {
 
     this.busDepotCount = busDepots;
     this.busStopCount = busStops;
+    this.trainStationCount = trainStations;
 
     if (busDepots > 0 && busStops > 0) {
       let targetRidership = Math.round((coveredPop * 0.45 + coveredJobs * 0.35) * (this.fundingTransit / 100));
@@ -270,6 +279,17 @@ export class SimulationEngine {
       this.busRidership = Math.max(0, targetRidership);
     } else {
       this.busRidership = 0;
+    }
+
+    if (trainStations > 0 && trainTracks > 0) {
+      const stationMultiplier = trainStations >= 2 ? 1.5 : 1.0;
+      let targetTrainRidership = Math.round((coveredPop * 0.40 + coveredJobs * 0.30) * stationMultiplier * (this.fundingTransit / 100));
+      if (this.ordinances.freeTransit) {
+        targetTrainRidership = Math.round(targetTrainRidership * 1.4);
+      }
+      this.trainRidership = Math.max(0, targetTrainRidership);
+    } else {
+      this.trainRidership = 0;
     }
   }
 
@@ -416,8 +436,13 @@ export class SimulationEngine {
     const taxModC = (9 - this.taxRateC) * 3;
     const taxModI = (9 - this.taxRateI) * 3;
 
-    const transitBonusR = (this.ordinances.freeTransit ? 10 : 0) + (this.busRidership > 0 ? Math.min(10, Math.floor(this.busRidership / 20)) : 0);
-    const transitBonusC = (this.ordinances.freeTransit ? 15 : 0) + (this.busRidership > 0 ? Math.min(15, Math.floor(this.busRidership / 15)) : 0);
+    const busBonusR = (this.busRidership > 0 ? Math.min(10, Math.floor(this.busRidership / 20)) : 0);
+    const busBonusC = (this.busRidership > 0 ? Math.min(15, Math.floor(this.busRidership / 15)) : 0);
+    const trainBonusR = (this.trainRidership > 0 ? Math.min(12, Math.floor(this.trainRidership / 25)) : 0);
+    const trainBonusC = (this.trainRidership > 0 ? Math.min(15, Math.floor(this.trainRidership / 20)) : 0);
+
+    const transitBonusR = (this.ordinances.freeTransit ? 10 : 0) + busBonusR + trainBonusR;
+    const transitBonusC = (this.ordinances.freeTransit ? 15 : 0) + busBonusC + trainBonusC;
 
     const rewardBonusR = (this.hasMayorsMansion ? 10 : 0) + (this.hasGrandCentral ? 15 : 0);
     const rewardBonusC = (this.hasMayorsMansion ? 10 : 0) + (this.hasGrandCentral ? 25 : 0);
@@ -520,6 +545,8 @@ export class SimulationEngine {
         else if (t.type === TileType.SCHOOL) baseEducation += UPKEEP.SCHOOL;
         else if (t.type === TileType.BUS_DEPOT) baseTransit += UPKEEP.BUS_DEPOT;
         else if (t.type === TileType.BUS_STOP) baseTransit += UPKEEP.BUS_STOP;
+        else if (t.type === TileType.TRAIN_STATION) baseTransit += UPKEEP.TRAIN_STATION;
+        else if (t.type === TileType.TRAIN_TRACK) baseTransit += UPKEEP.TRAIN_TRACK;
         else if (t.type === TileType.MAYORS_MANSION) baseCivicRewards += UPKEEP.MAYORS_MANSION;
         else if (t.type === TileType.CITY_HALL) baseCivicRewards += UPKEEP.CITY_HALL;
         else if (t.type === TileType.GRAND_CENTRAL) baseCivicRewards += UPKEEP.GRAND_CENTRAL;
@@ -616,6 +643,7 @@ export class SimulationEngine {
         fundingEducation: this.fundingEducation,
         fundingTransit: this.fundingTransit,
         busRidership: this.busRidership,
+        trainRidership: this.trainRidership,
         unlockedMilestones: this.unlockedMilestones,
         weather: this.weather,
         ordinances: this.ordinances,
@@ -681,6 +709,7 @@ export class SimulationEngine {
       if (data.fundingEducation !== undefined) this.fundingEducation = data.fundingEducation;
       if (data.fundingTransit !== undefined) this.fundingTransit = data.fundingTransit;
       if (data.busRidership !== undefined) this.busRidership = data.busRidership;
+      if (data.trainRidership !== undefined) this.trainRidership = data.trainRidership;
       if (Array.isArray(data.unlockedMilestones)) {
         this.unlockedMilestones = data.unlockedMilestones;
       }

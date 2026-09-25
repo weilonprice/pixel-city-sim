@@ -55,7 +55,7 @@ window.addEventListener('DOMContentLoaded', () => {
   let dragCurrentGridY = -1;
 
   function isDragTool(tool: string): boolean {
-    return tool.startsWith('zone-') || tool === 'road' || tool === 'dirt-road' || tool === 'avenue' || tool === 'demolish';
+    return tool.startsWith('zone-') || tool === 'road' || tool === 'dirt-road' || tool === 'avenue' || tool === 'train-track' || tool === 'demolish';
   }
 
   function resize() {
@@ -115,6 +115,11 @@ window.addEventListener('DOMContentLoaded', () => {
       else if (tile.type === TileType.PARK) desc = 'Public Park (+30 Land Value)';
       else if (tile.type === TileType.BUS_DEPOT) desc = `Municipal Bus Depot (Fleet Dispatch HQ • Upkeep $15/mo • P:${tile.powered ? '⚡' : '❌'} W:${tile.watered ? '💧' : '❌'})`;
       else if (tile.type === TileType.BUS_STOP) desc = `Roadside Bus Stop (Radius: 8 • Transit Cov: ${tile.transitCoverage}% • Upkeep $1/mo)`;
+      else if (tile.type === TileType.TRAIN_STATION) desc = `Passenger Train Station (Radius: 14 • Rail Ridership: ${engine.trainRidership} • Upkeep $25/mo • P:${tile.powered ? '⚡' : '❌'} W:${tile.watered ? '💧' : '❌'})`;
+      else if (tile.type === TileType.TRAIN_TRACK) {
+        const trackType = tile.isBridge ? 'Steel Railroad Trestle Bridge' : 'Railroad Track';
+        desc = `${trackType} (Transit Cov: ${tile.transitCoverage}% • Upkeep $0.15/mo)`;
+      }
       else if (tile.type === TileType.MAYORS_MANSION) desc = `Mayor's Historic Mansion (Civic Landmark • +10 City Demand • +25 Land Value • Upkeep $20/mo • P:${tile.powered ? '⚡' : '❌'} W:${tile.watered ? '💧' : '❌'})`;
       else if (tile.type === TileType.CITY_HALL) desc = `Majestic City Hall (Seat of Municipal Govt • -10% All City Upkeeps • +35 Land Value • Upkeep $50/mo • P:${tile.powered ? '⚡' : '❌'} W:${tile.watered ? '💧' : '❌'})`;
       else if (tile.type === TileType.GRAND_CENTRAL) desc = `Grand Central Terminal (Metropolitan Transit Monument • +25 Commercial Demand • Upkeep $100/mo • P:${tile.powered ? '⚡' : '❌'} W:${tile.watered ? '💧' : '❌'})`;
@@ -173,7 +178,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
       if (dragStartGridX === dragCurrentGridX && dragStartGridY === dragCurrentGridY) {
         applyTool(dragStartGridX, dragStartGridY);
-      } else if (tool === 'road' || tool === 'dirt-road' || tool === 'avenue') {
+      } else if (tool === 'road' || tool === 'dirt-road' || tool === 'avenue' || tool === 'train-track') {
         // Line road dragging along dominant axis
         const dx = dragCurrentGridX - dragStartGridX;
         const dy = dragCurrentGridY - dragStartGridY;
@@ -552,6 +557,71 @@ window.addEventListener('DOMContentLoaded', () => {
       tile.zone = ZoneType.NONE;
       tile.building = undefined;
       grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation, engine.fundingTransit, engine.ordinances);
+      engine.updateTransitMetrics();
+      return;
+    }
+
+    // Passenger Train Station
+    if (tool === 'train-station') {
+      if (tile.type !== TileType.GRASS && tile.type !== TileType.DIRT) return;
+      if (engine.funds < COSTS.TRAIN_STATION) {
+        sounds.playError();
+        hud.showToast("Not enough funds for Train Station ($750)!");
+        return;
+      }
+      engine.funds -= COSTS.TRAIN_STATION;
+      sounds.playBuild();
+      sounds.playTrainHorn();
+      tile.type = TileType.TRAIN_STATION;
+      tile.zone = ZoneType.NONE;
+      tile.building = undefined;
+      engine.updateUtilities();
+      grid.updateRoadAndNeighbors(x, y);
+      grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation, engine.fundingTransit, engine.ordinances);
+      engine.updateTransitMetrics();
+      return;
+    }
+
+    // Heavy Railroad Track
+    if (tool === 'train-track') {
+      // Over water -> Railroad bridge
+      if (tile.type === TileType.WATER) {
+        const bridgeCost = 45; // railroad trestle bridge
+        if (engine.funds < bridgeCost) {
+          sounds.playError();
+          hud.showToast("Not enough funds for Railroad Bridge ($45)!");
+          return;
+        }
+        engine.funds -= bridgeCost;
+        sounds.playBuild();
+        sounds.playTrainChug();
+        tile.type = TileType.TRAIN_TRACK;
+        tile.isBridge = true;
+        tile.elevation = 0;
+        tile.zone = ZoneType.NONE;
+        tile.building = undefined;
+        grid.updateRoadAndNeighbors(x, y);
+        engine.updateUtilities();
+        grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation, engine.fundingTransit, engine.ordinances);
+        engine.updateTransitMetrics();
+        return;
+      }
+
+      if (tile.type !== TileType.GRASS && tile.type !== TileType.DIRT) return;
+      if (engine.funds < COSTS.TRAIN_TRACK) {
+        sounds.playError();
+        hud.showToast("Not enough funds for Railroad Track ($15)!");
+        return;
+      }
+      engine.funds -= COSTS.TRAIN_TRACK;
+      sounds.playBuild();
+      tile.type = TileType.TRAIN_TRACK;
+      tile.zone = ZoneType.NONE;
+      tile.building = undefined;
+      grid.updateRoadAndNeighbors(x, y);
+      engine.updateUtilities();
+      grid.recalculateServiceCoverages(engine.fundingFire, engine.fundingPolice, engine.fundingHealth, engine.fundingEducation, engine.fundingTransit, engine.ordinances);
+      engine.updateTransitMetrics();
       return;
     }
 

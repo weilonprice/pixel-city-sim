@@ -250,9 +250,9 @@
       border-top: 3px solid #14141c;
       display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 6px;
-      padding: 0 12px;
+      justify-content: flex-start;
+      gap: 4px;
+      padding: 0 8px;
       z-index: 10;
       overflow-x: auto;
     }
@@ -325,9 +325,10 @@
       background: #2e2e40;
       border: 2px solid #45455c;
       color: #d1d5db;
-      padding: 4px 8px;
+      padding: 3px 5px;
       height: 50px;
-      min-width: 58px;
+      min-width: 48px;
+      flex-shrink: 0;
       cursor: pointer;
       font-family: inherit;
       font-size: 8px;
@@ -1239,6 +1240,16 @@
       <span class="tool-icon">🚏</span>
       <span>Stop</span>
       <span class="tool-cost">$50</span>
+    </button>
+    <button class="tool-btn" data-tool="train-station" title="Passenger Train Station ($750, transit radius 14)">
+      <span class="tool-icon">🚉</span>
+      <span>Station</span>
+      <span class="tool-cost">$750</span>
+    </button>
+    <button class="tool-btn" data-tool="train-track" title="Railroad Track ($15)">
+      <span class="tool-icon">🛤️</span>
+      <span>Track</span>
+      <span class="tool-cost">$15</span>
     </button>
     <button class="tool-btn locked" data-tool="mayors-mansion" id="tool-mayors-mansion" title="Mayor's Historic Mansion (Unlocked at 500 Pop) - $1,000">
       <span class="tool-icon">🏛️</span>

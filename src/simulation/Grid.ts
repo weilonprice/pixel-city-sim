@@ -1,4 +1,4 @@
-import { MAP_SIZE, Tile, TileType, ZoneType, isAnyRoad } from '../core/Constants.ts';
+import { MAP_SIZE, Tile, TileType, ZoneType, isAnyRoad, isTrackOrStation } from '../core/Constants.ts';
 
 export class Grid {
   public size: number;
@@ -136,7 +136,27 @@ export class Grid {
 
   public updateRoadMask(x: number, y: number) {
     const tile = this.getTile(x, y);
-    if (!tile || !isAnyRoad(tile.type)) return;
+    if (!tile) return;
+
+    if (tile.type === TileType.TRAIN_TRACK) {
+      let mask = 0;
+      const n = this.getTile(x, y - 1);
+      const e = this.getTile(x + 1, y);
+      const s = this.getTile(x, y + 1);
+      const w = this.getTile(x - 1, y);
+
+      const isConnectable = (t: Tile | null) => t && isTrackOrStation(t.type);
+
+      if (isConnectable(n)) mask |= 1;
+      if (isConnectable(e)) mask |= 2;
+      if (isConnectable(s)) mask |= 4;
+      if (isConnectable(w)) mask |= 8;
+
+      tile.roadMask = mask;
+      return;
+    }
+
+    if (!isAnyRoad(tile.type)) return;
 
     let mask = 0;
     const n = this.getTile(x, y - 1);
@@ -347,6 +367,21 @@ export class Grid {
           });
         }
 
+        // Passenger Train Station (Regional Heavy Rail Hub, Radius 14, High Transit & Land Value)
+        if (t.type === TileType.TRAIN_STATION && t.powered && t.watered) {
+          this.applyRadialEffect(x, y, 14, (target, dist) => {
+            target.transitCoverage = Math.max(target.transitCoverage, Math.round(100 * (1 - dist / 14)));
+            target.landValue = Math.min(100, target.landValue + Math.round(30 * (1 - dist / 14)));
+          });
+        }
+
+        // Heavy Railroad Track (Localized corridor transit coverage, Radius 2)
+        if (t.type === TileType.TRAIN_TRACK) {
+          this.applyRadialEffect(x, y, 2, (target, dist) => {
+            target.transitCoverage = Math.max(target.transitCoverage, Math.round(40 * (1 - dist / 2)));
+          });
+        }
+
         // Pollution from Industrial Zones & Coal Power Plants (Radius 9)
         if (t.type === TileType.POWER_PLANT || (t.building && t.building.zone === ZoneType.INDUSTRIAL)) {
           let intensity = t.type === TileType.POWER_PLANT ? 70 : 45;
@@ -402,5 +437,10 @@ export class Grid {
   public isAdjacentToHighwayConnectedRoad(x: number, y: number): boolean {
     const neighbors = this.getNeighbors(x, y);
     return neighbors.some(n => isAnyRoad(n.tile.type) && n.tile.type !== TileType.HIGHWAY && n.tile.connectedToHighway);
+  }
+
+  public isAdjacentToTrack(x: number, y: number): boolean {
+    const neighbors = this.getNeighbors(x, y);
+    return neighbors.some(n => isTrackOrStation(n.tile.type));
   }
 }

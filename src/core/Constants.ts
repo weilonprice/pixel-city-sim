@@ -29,11 +29,17 @@ export enum TileType {
   BUS_STOP = 'BUS_STOP',
   MAYORS_MANSION = 'MAYORS_MANSION',
   CITY_HALL = 'CITY_HALL',
-  GRAND_CENTRAL = 'GRAND_CENTRAL'
+  GRAND_CENTRAL = 'GRAND_CENTRAL',
+  TRAIN_STATION = 'TRAIN_STATION',
+  TRAIN_TRACK = 'TRAIN_TRACK'
 }
 
 export function isAnyRoad(type: TileType): boolean {
   return type === TileType.ROAD || type === TileType.DIRT_ROAD || type === TileType.AVENUE || type === TileType.HIGHWAY;
+}
+
+export function isTrackOrStation(type: TileType): boolean {
+  return type === TileType.TRAIN_TRACK || type === TileType.TRAIN_STATION;
 }
 
 export enum OverlayMode {
@@ -134,7 +140,9 @@ export const COSTS = {
   BUS_STOP: 50,
   MAYORS_MANSION: 1000,
   CITY_HALL: 2500,
-  GRAND_CENTRAL: 5000
+  GRAND_CENTRAL: 5000,
+  TRAIN_STATION: 750,
+  TRAIN_TRACK: 15
 } as const;
 
 export const UPKEEP = {
@@ -155,7 +163,9 @@ export const UPKEEP = {
   BUS_STOP: 1,
   MAYORS_MANSION: 20,
   CITY_HALL: 50,
-  GRAND_CENTRAL: 100
+  GRAND_CENTRAL: 100,
+  TRAIN_STATION: 25,
+  TRAIN_TRACK: 0.15
 } as const;
 
 export interface CityMilestone {

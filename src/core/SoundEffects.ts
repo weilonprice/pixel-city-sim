@@ -387,6 +387,79 @@ class SoundManager {
     whiteNoise.start(t);
   }
 
+  // Locomotive Train Horn (Classic twin-tone brass chime)
+  public playTrainHorn() {
+    if (this.isMuted) return;
+    this.initCtx();
+    if (!this.ctx || !this.masterGain) return;
+
+    const t = this.ctx.currentTime;
+    const dur = 0.55;
+    // Classic diesel/passenger train chime: Eb4 (311Hz), G4 (392Hz), Bb4 (466Hz)
+    const freqs = [311.13, 392.00, 466.16];
+
+    freqs.forEach(f => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(f, t);
+      // Slight pitch droop characteristic of pneumatic air horns
+      osc.frequency.linearRampToValueAtTime(f * 0.98, t + dur);
+
+      // Lowpass filter to give warm brass body
+      const filter = this.ctx!.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(1400, t);
+
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(0.045, t + 0.04); // quick attack
+      gain.gain.setValueAtTime(0.045, t + dur * 0.7);
+      gain.gain.linearRampToValueAtTime(0.0001, t + dur);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.masterGain!);
+
+      osc.start(t);
+      osc.stop(t + dur);
+    });
+  }
+
+  // Rhythmic Steam / Steel Rail Wheel Click
+  public playTrainChug() {
+    if (this.isMuted) return;
+    this.initCtx();
+    if (!this.ctx || !this.masterGain) return;
+
+    const t = this.ctx.currentTime;
+    const dur = 0.08;
+    const bufferSize = Math.floor(this.ctx.sampleRate * dur);
+    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      output[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.3));
+    }
+
+    const whiteNoise = this.ctx.createBufferSource();
+    whiteNoise.buffer = noiseBuffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(800, t);
+    filter.Q.setValueAtTime(3.0, t);
+
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.03, t);
+    gain.gain.linearRampToValueAtTime(0.001, t + dur);
+
+    whiteNoise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.masterGain);
+
+    whiteNoise.start(t);
+  }
+
   // Emergency Siren wail
   public playSiren() {
     if (this.isMuted) return;

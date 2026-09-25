@@ -217,6 +217,12 @@ export class NewsTicker {
       list.push("🚉 GRAND CENTRAL TERMINAL: Thousands of regional travelers stream through the monumental Beaux-Arts concourse!");
     }
 
+    // Heavy Rail Transit
+    if (this.engine.trainStationCount > 0) {
+      list.push(`🚂 ALL ABOARD: Passenger railway network carries ${this.engine.trainRidership} daily riders along steel corridors!`);
+      list.push("🚉 RAILWAY BOOM: Commuters celebrate rapid transit as passenger trains connect city districts.");
+    }
+
     // 7. Classic Humorous Headlines
     list.push(...this.humorHeadlines);
 
