@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "generate-assets": "tsx scripts/generate_pixellab_assets.ts"
   },
-  "dependencies": {},
   "devDependencies": {
+    "tsx": "^4.23.15",
     "typescript": "^5.4.5",
     "vite": "^5.2.11"
   }

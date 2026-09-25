@@ -1,6 +1,7 @@
 import { TILE_WIDTH, TILE_HEIGHT, TileType, ZoneType, Tile } from '../core/Constants.ts';
 import { Camera } from '../core/Camera.ts';
 import { Grid } from '../simulation/Grid.ts';
+import { assetManager } from './AssetManager.ts';
 
 interface Particle {
   x: number;
@@ -408,12 +409,25 @@ export class PixelRenderer {
     const level = b.level;
     const style = b.style;
 
-    if (b.zone === ZoneType.RESIDENTIAL) {
-      this.drawResidentialBuilding(sx, sy, hw, hh, level, style, z);
-    } else if (b.zone === ZoneType.COMMERCIAL) {
-      this.drawCommercialBuilding(sx, sy, hw, hh, level, style, z);
-    } else if (b.zone === ZoneType.INDUSTRIAL) {
-      this.drawIndustrialBuilding(sx, sy, hw, hh, level, style, z);
+    const spriteKey = b.zone === ZoneType.RESIDENTIAL
+      ? (level === 1 ? 'house_cottage' : (level === 2 ? 'townhouse' : 'apartment_tower'))
+      : (b.zone === ZoneType.COMMERCIAL
+        ? (level === 1 ? 'corner_diner' : (level === 2 ? 'office_building' : 'skyscraper'))
+        : (level === 1 ? 'warehouse' : 'factory'));
+
+    if (assetManager.hasSprite(spriteKey)) {
+      const img = assetManager.getSprite(spriteKey)!;
+      const w = img.naturalWidth * z;
+      const h = img.naturalHeight * z;
+      this.ctx.drawImage(img, sx - w / 2, sy + hh - h, w, h);
+    } else {
+      if (b.zone === ZoneType.RESIDENTIAL) {
+        this.drawResidentialBuilding(sx, sy, hw, hh, level, style, z);
+      } else if (b.zone === ZoneType.COMMERCIAL) {
+        this.drawCommercialBuilding(sx, sy, hw, hh, level, style, z);
+      } else if (b.zone === ZoneType.INDUSTRIAL) {
+        this.drawIndustrialBuilding(sx, sy, hw, hh, level, style, z);
+      }
     }
 
     // Power / Water / Highway Warning Icons
@@ -626,6 +640,13 @@ export class PixelRenderer {
 
   private drawPowerPlant(sx: number, sy: number, hw: number, hh: number) {
     const z = this.camera.zoom;
+    if (assetManager.hasSprite('power_plant')) {
+      const img = assetManager.getSprite('power_plant')!;
+      const w = img.naturalWidth * z;
+      const h = img.naturalHeight * z;
+      this.ctx.drawImage(img, sx - w / 2, sy + hh - h, w, h);
+      return;
+    }
     const height = 40 * z;
 
     this.drawIsometricBox(sx, sy, hw * 0.8, hh * 0.8, height, '#475569', '#334155', '#1e293b');
@@ -641,6 +662,13 @@ export class PixelRenderer {
 
   private drawWaterPump(sx: number, sy: number, hw: number, hh: number) {
     const z = this.camera.zoom;
+    if (assetManager.hasSprite('water_pump')) {
+      const img = assetManager.getSprite('water_pump')!;
+      const w = img.naturalWidth * z;
+      const h = img.naturalHeight * z;
+      this.ctx.drawImage(img, sx - w / 2, sy + hh - h, w, h);
+      return;
+    }
     const height = 26 * z;
 
     this.drawIsometricBox(sx, sy, hw * 0.75, hh * 0.75, height, '#0284c7', '#0369a1', '#075985');
@@ -652,8 +680,15 @@ export class PixelRenderer {
   }
 
   private drawPark(sx: number, sy: number, hw: number, hh: number, variant: number) {
-    const ctx = this.ctx;
     const z = this.camera.zoom;
+    if (assetManager.hasSprite('city_park')) {
+      const img = assetManager.getSprite('city_park')!;
+      const w = img.naturalWidth * z;
+      const h = img.naturalHeight * z;
+      this.ctx.drawImage(img, sx - w / 2, sy + hh - h, w, h);
+      return;
+    }
+    const ctx = this.ctx;
 
     ctx.fillStyle = '#a8a29e';
     ctx.beginPath();
