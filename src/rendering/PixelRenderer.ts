@@ -33,7 +33,7 @@ interface Vehicle {
   color: string;
   speed: number;
   isTruck?: boolean;
-  isEmergency?: 'fire' | 'police';
+  isEmergency?: 'fire' | 'police' | 'medical';
   isBus?: boolean;
   isTrain?: boolean;
   passengers?: number;
@@ -177,7 +177,7 @@ export class PixelRenderer {
     if (tile.type === TileType.PARK) {
       this.drawPark(sx, sy, halfW, halfH, tile.variant);
     } else if (tile.type === TileType.POWER_PLANT) {
-      this.drawPowerPlant(sx, sy, halfW, halfH);
+      this.drawPowerPlant(sx, sy, halfW, halfH, tile);
     } else if (tile.type === TileType.WATER_PUMP) {
       this.drawWaterPump(sx, sy, halfW, halfH);
     } else if (tile.type === TileType.FIRE_STATION) {
@@ -1820,7 +1820,7 @@ export class PixelRenderer {
       ? (level === 1 ? 'house_cottage' : (level === 2 ? 'townhouse' : (level === 3 ? 'apartment_tower' : (level === 4 ? 'horizon_residence' : 'apex_pinnacle'))))
       : (b.zone === ZoneType.COMMERCIAL
         ? (level === 1 ? 'corner_diner' : (level === 2 ? 'office_building' : (level === 3 ? 'skyscraper' : (level === 4 ? 'corporate_plaza' : 'world_trade_tower'))))
-        : (level === 1 ? 'warehouse' : (level === 2 ? 'factory' : (level === 3 ? 'factory' : (level === 4 ? 'biotech_campus' : 'aerospace_factory')))));
+        : (level === 1 ? 'warehouse' : (level === 2 ? 'factory' : (level === 3 ? 'refinery' : (level === 4 ? 'biotech_campus' : 'aerospace_factory')))));
 
     if (spriteKey && assetManager.hasSprite(spriteKey)) {
       const img = assetManager.getSprite(spriteKey)!;
@@ -2415,10 +2415,13 @@ export class PixelRenderer {
     }
   }
 
-  private drawPowerPlant(sx: number, sy: number, hw: number, hh: number) {
+  private drawPowerPlant(sx: number, sy: number, hw: number, hh: number, tile?: Tile) {
     const z = this.camera.zoom;
-    if (assetManager.hasSprite('power_plant')) {
-      const img = assetManager.getSprite('power_plant')!;
+    const isSolar = (this.engine.ordinances.cleanEnergy || (tile && (tile.x + tile.y) % 2 === 1)) && assetManager.hasSprite('solar_farm');
+    const spriteKey = isSolar ? 'solar_farm' : 'power_plant';
+
+    if (assetManager.hasSprite(spriteKey)) {
+      const img = assetManager.getSprite(spriteKey)!;
       const w = img.naturalWidth * z;
       const h = img.naturalHeight * z;
       this.ctx.drawImage(img, sx - w / 2, sy + hh - h, w, h);
@@ -2772,9 +2775,16 @@ export class PixelRenderer {
           const colors = ['#f59e0b', '#3b82f6', '#ef4444', '#10b981', '#f3f4f6'];
 
           // Emergency vehicle chance
-          let isEmergency: 'fire' | 'police' | undefined;
-          if (Math.random() < 0.15) {
-            isEmergency = Math.random() < 0.5 ? 'fire' : 'police';
+          let isEmergency: 'fire' | 'police' | 'medical' | undefined;
+          if (Math.random() < 0.18) {
+            const roll = Math.random();
+            if (roll < 0.35) {
+              isEmergency = 'fire';
+            } else if (roll < 0.7) {
+              isEmergency = 'police';
+            } else {
+              isEmergency = 'medical';
+            }
           }
 
           this.vehicles.push({
@@ -2783,7 +2793,7 @@ export class PixelRenderer {
             y: start.y,
             targetX: target.x,
             targetY: target.y,
-            color: isEmergency === 'fire' ? '#dc2626' : (isEmergency === 'police' ? '#1e3a8a' : colors[Math.floor(Math.random() * colors.length)]),
+            color: isEmergency === 'fire' ? '#dc2626' : (isEmergency === 'police' ? '#1e3a8a' : (isEmergency === 'medical' ? '#f8fafc' : colors[Math.floor(Math.random() * colors.length)])),
             speed: isEmergency ? 0.055 : 0.035,
             isEmergency
           });
@@ -2955,7 +2965,7 @@ export class PixelRenderer {
 
       // Emergency flashing siren
       if (v.isEmergency) {
-        const spriteKey = v.isEmergency === 'fire' ? 'fire_truck' : 'police_car';
+        const spriteKey = v.isEmergency === 'fire' ? 'fire_truck' : (v.isEmergency === 'police' ? 'police_car' : 'ambulance');
         if (assetManager.hasSprite(spriteKey)) {
           const img = assetManager.getSprite(spriteKey)!;
           const w = 22 * z;
@@ -2966,7 +2976,7 @@ export class PixelRenderer {
           this.ctx.fillRect(sx - 3 * z, sy - 2 * z, 6 * z, 4 * z);
         }
 
-        const sirenColor = (this.animFrame % 16 < 8) ? '#ef4444' : '#38bdf8';
+        const sirenColor = (this.animFrame % 16 < 8) ? (v.isEmergency === 'medical' ? '#38bdf8' : '#ef4444') : (v.isEmergency === 'medical' ? '#ef4444' : '#38bdf8');
         this.ctx.fillStyle = sirenColor;
         this.ctx.fillRect(sx - 1 * z, sy - 4 * z, 2 * z, 2 * z);
         continue;

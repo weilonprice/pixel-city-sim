@@ -276,6 +276,28 @@ const ASSET_QUEUE: AssetRequest[] = [
     width: 64,
     height: 64,
     direction: 'south-east'
+  },
+  // 10. Batch 4: Industrial Tier 3, Clean Energy & Medical Response
+  {
+    id: 'refinery',
+    description: 'Isometric 2.5D oil and chemical refinery facility with silver spherical pressure tanks, distillation columns, pipes and steel catwalks, clean 16-bit pixel art',
+    width: 64,
+    height: 64,
+    direction: 'south-east'
+  },
+  {
+    id: 'solar_farm',
+    description: 'Isometric 2.5D modern clean energy solar panel array farm with blue photovoltaic panels, inverter unit, and perimeter fence, clean 16-bit pixel art',
+    width: 64,
+    height: 64,
+    direction: 'south-east'
+  },
+  {
+    id: 'ambulance',
+    description: 'Isometric 2.5D white municipal ambulance emergency response van with red stripe and emergency roof lights, clean 16-bit pixel art',
+    width: 48,
+    height: 48,
+    direction: 'south-east'
   }
 ];
 

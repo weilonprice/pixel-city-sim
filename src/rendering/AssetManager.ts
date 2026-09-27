@@ -45,7 +45,10 @@ export class AssetManager {
       'corporate_plaza',
       'world_trade_tower',
       'biotech_campus',
-      'aerospace_factory'
+      'aerospace_factory',
+      'refinery',
+      'solar_farm',
+      'ambulance'
     ];
 
     const baseUrl = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;

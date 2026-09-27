@@ -98,15 +98,15 @@ Buildings evolve dynamically based on land value, utilities, health, education, 
 
 ---
 
-### 🎨 33 Official PixelLab 16-Bit Pixel Art Sprites
-The game integrates 33 official pixel art sprite assets generated directly via **PixelLab AI**, managed through `AssetManager.ts` with instant procedural canvas fallbacks:
+### 🎨 36 Official PixelLab 16-Bit Pixel Art Sprites
+The game integrates 36 official pixel art sprite assets generated directly via **PixelLab AI**, managed through `AssetManager.ts` with instant procedural canvas fallbacks:
 - **Residential**: Cottage, Townhouse, Apartment Tower, Horizon Residences, Apex Pinnacle Megatower
 - **Commercial**: Corner Diner, Office Building, Skyscraper, Corporate Financial Plaza, World Trade Megatower
-- **Industrial**: Warehouse, Brick Factory, Biotech Clean Campus, Aerospace Robotics Megafactory
-- **Utilities & Services**: Coal Power Plant, Water Pump, City Park, Fire Station, Police Station, Hospital, School
+- **Industrial (All 5 Tiers)**: Warehouse, Brick Factory, Chemical & Oil Refinery, Biotech Clean Campus, Aerospace Robotics Megafactory
+- **Utilities & Services**: Coal Power Plant, Photovoltaic Solar Farm, Water Pump, City Park, Fire Station, Police Station, Hospital, School
 - **Transit & Rail**: Bus Depot, Roadside Bus Stop, City Bus, Train Station, Passenger Locomotive
 - **Civic Monuments**: Mayor's Mansion, City Hall, Grand Central Terminal
-- **Vehicles**: Yellow Taxi, Interstate Semi-Truck, Fire Engine, Police Cruiser
+- **Vehicles**: Yellow Taxi, Interstate Semi-Truck, Fire Engine, Police Cruiser, Municipal Emergency Ambulance
 
 ---
 
@@ -196,7 +196,7 @@ Follow ongoing development in [TODO.md](TODO.md) and [next_steps_todo.md](next_s
 - [x] Dynamic Weather, Day/Night Cycle & Procedural Audio
 - [x] High-Density Skylines (Tiers 4 & 5 Megatowers)
 - [x] Natural Disasters & Emergency Operations Center
-- [x] 33 Official PixelLab 16-Bit Pixel Art Sprites
+- [x] 36 Official PixelLab 16-Bit Pixel Art Sprites
 - [ ] 🚇 Underground Subway / Metro Layer with subterranean tunneling
 - [ ] 🎡 Waterfront Marinas, Boardwalks & Metropolitan Sports Stadiums
 
