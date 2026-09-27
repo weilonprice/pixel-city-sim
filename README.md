@@ -5,7 +5,11 @@ A modern retro isometric city-building simulation game inspired by **SimCity 200
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue.svg)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.4-646CFF.svg)](https://vitejs.dev/)
 [![PixelLab](https://img.shields.io/badge/PixelLab-AI%20Assets-9333ea.svg)](https://www.pixellab.ai)
+[![Deploy to GitHub Pages](https://github.com/weilonprice/pixel-city-sim/actions/workflows/deploy.yml/badge.svg)](https://github.com/weilonprice/pixel-city-sim/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+> 🎮 **Live Playable Simulation (Click to Play in Browser)**:  
+> ### 🔗 **[https://weilonprice.github.io/pixel-city-sim/](https://weilonprice.github.io/pixel-city-sim/)**
 
 ---
 

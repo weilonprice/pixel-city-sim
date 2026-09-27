@@ -48,9 +48,10 @@ export class AssetManager {
       'aerospace_factory'
     ];
 
+    const baseUrl = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
     for (const key of assetKeys) {
       const img = new Image();
-      img.src = `/assets/sprites/${key}.png`;
+      img.src = `${baseUrl}assets/sprites/${key}.png`;
       img.onload = () => {
         this.sprites.set(key, img);
         this.loadedKeys.add(key);
